@@ -1,42 +1,70 @@
 import csv
 import json
 from pathlib import Path
+import time
 
 # Path to the IoT telemetry dataset
 DATA_FILE = Path(__file__).parent / "data" / "iot_telemetry_data.csv"
 
 
-def display_sensor_data():
+# Replay the dataset faster than real time
+REPLAY_SPEED = 10
+
+# Limit used while testing the simulator
+MAX_READINGS = 10
+
+
+def create_sensor_message(row):
     """
-    Read the sensor dataset and display sample readings.
+    Convert a CSV row into a structured sensor message.
     """
+    return {
+        "ts": float(row["ts"]),
+        "device": row["device"],
+        "co": float(row["co"]),
+        "humidity": float(row["humidity"]),
+        "light": row["light"].lower() == "true",
+        "lpg": float(row["lpg"]),
+        "motion": row["motion"].lower() == "true",
+        "smoke": float(row["smoke"]),
+        "temp": float(row["temp"])
+    }
+
+
+def replay_sensor_data():
+    """
+    Replay sensor readings using the timing from the original dataset.
+    """
+
+    previous_timestamp = None
 
     with open(DATA_FILE, "r", newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
 
-        print("Dataset columns:")
-        print(reader.fieldnames)
+        print("Starting IoT sensor simulation...\n")
 
-        print("\nFirst 5 sensor readings:")
+        for reading_number, row in enumerate(reader, start=1):
 
-        for row_number, row in enumerate(reader, start=1):
-            sensor_message = {
-                "ts": float(row["ts"]),
-                "device": row["device"],
-                "co": float(row["co"]),
-                "humidity": float(row["humidity"]),
-                "light": row["light"].lower() == "true",
-                "lpg": float(row["lpg"]),
-                "motion": row["motion"].lower() == "true",
-                "smoke": float(row["smoke"]),
-                "temp": float(row["temp"])
-            }
+            sensor_message = create_sensor_message(row)
+            current_timestamp = sensor_message["ts"]
 
+            if previous_timestamp is not None:
+                delay = (current_timestamp - previous_timestamp) / REPLAY_SPEED
+
+                if delay > 0:
+                    time.sleep(delay)
+
+            print(f"Simulated reading {reading_number}:")
             print(json.dumps(sensor_message, indent=4))
+            print()
 
-            if row_number == 5:
+            previous_timestamp = current_timestamp
+
+            if reading_number == MAX_READINGS:
                 break
+
+    print("Sensor simulation complete.")
 
 
 if __name__ == "__main__":
-    display_sensor_data()
+    replay_sensor_data()
