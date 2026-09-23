@@ -2,6 +2,12 @@ import csv
 import json
 from pathlib import Path
 import time
+import paho.mqtt.client as mqtt
+
+# MQTT configuration
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+MQTT_TOPIC = "sensors/telemetry"
 
 # Path to the IoT telemetry dataset
 DATA_FILE = Path(__file__).parent / "data" / "iot_telemetry_data.csv"
@@ -30,6 +36,30 @@ def create_sensor_message(row):
         "temp": float(row["temp"])
     }
 
+def connect_to_mqtt():
+    """
+    Connect to the MQTT broker.
+    """
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.loop_start()
+
+    print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
+
+    return client
+
+def publish_sensor_message(client, sensor_message):
+    """
+    Publish a sensor reading to the MQTT broker.
+    """
+    payload = json.dumps(sensor_message)
+
+    client.publish(
+        MQTT_TOPIC,
+        payload
+    )
+
+    print(f"Published to MQTT topic: {MQTT_TOPIC}")
 
 def replay_sensor_data():
     """
