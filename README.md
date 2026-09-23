@@ -258,6 +258,228 @@ For every row, the simulator performs the following steps:
 3. Converts `light` and `motion` into Boolean values.
 4. Creates a structured Python sensor message.
 5. Converts the sensor message into JSON.
+
+---
+
+# Kafka Integration
+
+Kafka is used as a second-stage messaging system after MQTT. The Python sensor does not publish directly to Kafka. Kafka Connect subscribes to MQTT and forwards the MQTT messages to Kafka.
+
+The complete data flow is:
+
+```text
+CSV Dataset
+     ↓
+Data_Sensor.py
+     ↓ MQTT: sensors/telemetry
+Eclipse Mosquitto (localhost:1883)
+     ↓
+Kafka Connect MQTT Source Connector
+     ↓ Kafka: sensor-telemetry
+Apache Kafka Broker (localhost:9092)
+     ↓
+Kafka Consumer
+```
+
+## Kafka Components
+
+The local prototype uses:
+
+- Apache Kafka `2.13-3.6.1`
+- Kafka broker on `localhost:9092`
+- Kafka Connect REST API on `localhost:8083`
+- MQTT broker on `localhost:1883`
+- MQTT source connector class `io.confluent.connect.mqtt.MqttSourceConnector`
+- MQTT source connector version `1.7.9`
+- Kafka topic `sensor-telemetry`
+
+Kafka broker, Kafka Connect, Mosquitto, the consumer, and the sensor are separate processes. Run each long-running process in its own VS Code PowerShell terminal.
+
+## Kafka Connect Plugin Setup
+
+Kafka Connect needs an MQTT source connector plugin. The connector package includes the main connector JAR and its dependency JARs.
+
+Download the Confluent Platform file Here:
+[text](https://www.confluent.io/hub/confluentinc/kafka-connect-mqtt)
+
+The current local plugin layout is:
+
+```text
+C:\kafka\plugins\
+└── confluentinc-kafka-connect-mqtt-1.7.9\
+     ├── kafka-connect-mqtt-1.7.9.jar
+     ├── org.eclipse.paho.client.mqttv3-1.2.5.jar
+     └── other connector dependency JARs
+```
+
+All JAR files for this connector must be in the same plugin directory. Kafka Connect is configured in `C:\kafka\config\connect-distributed.properties` with:
+
+```properties
+plugin.path=C:/kafka/plugins
+```
+
+After changing the plugin files or this setting, restart Kafka Connect.
+
+## Starting the Services
+
+Start the services in this order. Keep each command running in its own terminal.
+
+### 1. Start Mosquitto
+
+In the terminal named `mqtt broker`:
+
+```powershell
+& "C:\Program Files\mosquitto\mosquitto.exe" -v
+```
+
+### 2. Start Kafka
+
+In the terminal named `kafka broker`:
+
+```powershell
+Set-Location "C:\kafka"
+.\bin\windows\kafka-server-start.bat .\config\kraft\server.properties
+```
+
+Kafka must be running before Kafka Connect starts.
+
+### 3. Start Kafka Connect
+
+In the terminal named `kafka connect`:
+
+```powershell
+Set-Location "C:\kafka"
+.\bin\windows\connect-distributed.bat .\config\connect-distributed.properties
+```
+
+Kafka Connect should remain running and listen on port `8083`.
+
+### 4. Start an MQTT Subscriber
+
+In the terminal named `mosquitto_sub`:
+
+```powershell
+& "C:\Program Files\mosquitto\mosquitto_sub.exe" -h localhost -p 1883 -t sensors/telemetry -v
+```
+
+### 5. Start a Kafka Consumer
+
+In the terminal named `kafka consumer`:
+
+```powershell
+Set-Location "C:\kafka"
+.\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic sensor-telemetry --from-beginning
+```
+
+### 6. Start the Sensor
+
+In the terminal named `sensor`:
+
+```powershell
+Set-Location "C:\Devops_Group_Project"
+py .\Prototype\Data_Sensor.py
+```
+
+## Verify Kafka Connect
+
+Use a separate PowerShell terminal for these commands.
+
+Check that Kafka Connect is responding:
+
+```powershell
+Invoke-RestMethod http://localhost:8083/
+```
+
+Check that the MQTT connector is loaded:
+
+```powershell
+Invoke-RestMethod http://localhost:8083/connector-plugins
+```
+
+The response should include:
+
+```text
+io.confluent.connect.mqtt.MqttSourceConnector
+```
+
+## Register the MQTT Connector
+
+Run this in a separate PowerShell terminal after Kafka, Mosquitto, and Kafka Connect are running:
+
+```powershell
+$body = @{
+     name = "mqtt-source"
+     config = @{
+          "connector.class" = "io.confluent.connect.mqtt.MqttSourceConnector"
+          "tasks.max" = "1"
+          "mqtt.server.uri" = "tcp://localhost:1883"
+          "mqtt.topics" = "sensors/telemetry"
+          "mqtt.qos" = "0"
+          "kafka.topic" = "sensor-telemetry"
+          "confluent.topic.bootstrap.servers" = "localhost:9092"
+          "confluent.topic.replication.factor" = "1"
+          "key.converter" = "org.apache.kafka.connect.storage.StringConverter"
+          "value.converter" = "org.apache.kafka.connect.storage.StringConverter"
+     }
+} | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod `
+     -Method Post `
+     -Uri "http://localhost:8083/connectors" `
+     -ContentType "application/json" `
+     -Body $body
+```
+
+The replication factor is `1` because this prototype uses one Kafka broker.
+
+Confirm that the connector was registered:
+
+```powershell
+Invoke-RestMethod http://localhost:8083/connectors
+```
+
+Check the connector and task status:
+
+```powershell
+Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
+```
+
+The connector and task should both report:
+
+```text
+RUNNING
+```
+
+## Expected Results
+
+When the sensor is running:
+
+- `mosquitto_sub` displays messages on `sensors/telemetry`.
+- The Kafka Connect connector reads those MQTT messages.
+- The Kafka consumer displays records from `sensor-telemetry`.
+- The original sensor JSON is forwarded as the Kafka record value.
+
+## Troubleshooting
+
+Check Kafka before checking Kafka Connect:
+
+```powershell
+Test-NetConnection localhost -Port 9092
+```
+
+The result should contain:
+
+```text
+TcpTestSucceeded : True
+```
+
+If `/connectors` returns an empty list, the MQTT connector has not been registered yet. If `/connector-plugins` does not list `MqttSourceConnector`, check `plugin.path`, confirm the connector JARs are present, and restart Kafka Connect.
+
+If connector registration reports `Missing required configuration "confluent.topic.bootstrap.servers"`, add `confluent.topic.bootstrap.servers=localhost:9092` and `confluent.topic.replication.factor=1` to the connector configuration.
+
+If the Kafka consumer is blank, first confirm that `mosquitto_sub` receives messages, then check the MQTT connector status. A blank consumer does not necessarily indicate an error; it may simply be waiting for a Kafka record.
+
+Stop the services with `Ctrl+C` in the reverse order of startup. Do not delete or reformat Kafka storage for a normal restart.
 6. Calculates the time difference between the current reading and the previous reading.
 7. Uses this difference to simulate the original sensor timing.
 8. Speeds the replay up using the `REPLAY_SPEED` value.
@@ -311,7 +533,7 @@ First, make sure:
 1. Mosquitto is running.
 2. The dataset is located at:
 
-```text
+```
 Prototype/data/iot_telemetry_data.csv
 ```
 
