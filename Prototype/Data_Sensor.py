@@ -53,7 +53,6 @@ def publish_sensor_message(client, sensor_message):
     Publish a sensor reading to the MQTT broker.
     """
     payload = json.dumps(sensor_message)
-
     client.publish(
         MQTT_TOPIC,
         payload
@@ -67,6 +66,8 @@ def replay_sensor_data():
     """
 
     previous_timestamp = None
+
+    client = connect_to_mqtt()
 
     with open(DATA_FILE, "r", newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
@@ -84,6 +85,8 @@ def replay_sensor_data():
                 if delay > 0:
                     time.sleep(delay)
 
+            publish_sensor_message(client, sensor_message)
+
             print(f"Simulated reading {reading_number}:")
             print(json.dumps(sensor_message, indent=4))
             print()
@@ -93,6 +96,9 @@ def replay_sensor_data():
             if reading_number == MAX_READINGS:
                 break
 
+    client.loop_stop()
+    client.disconnect()
+    
     print("Sensor simulation complete.")
 
 
