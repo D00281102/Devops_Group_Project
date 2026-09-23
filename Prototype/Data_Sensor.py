@@ -1,4 +1,5 @@
 import csv
+import json
 from pathlib import Path
 
 # Path to the IoT telemetry dataset
@@ -19,7 +20,19 @@ def display_sensor_data():
         print("\nFirst 5 sensor readings:")
 
         for row_number, row in enumerate(reader, start=1):
-            print(f"{row_number}: {row}")
+            sensor_message = {
+                "ts": float(row["ts"]),
+                "device": row["device"],
+                "co": float(row["co"]),
+                "humidity": float(row["humidity"]),
+                "light": row["light"].lower() == "true",
+                "lpg": float(row["lpg"]),
+                "motion": row["motion"].lower() == "true",
+                "smoke": float(row["smoke"]),
+                "temp": float(row["temp"])
+            }
+
+            print(json.dumps(sensor_message, indent=4))
 
             if row_number == 5:
                 break
