@@ -847,3 +847,430 @@ Eclipse Mosquitto MQTT Broker
      ↓
 MQTT Subscriber / Project Integration
 ```
+
+
+
+
+This document contains everything you need to connect to the shared PostgreSQL
+database that holds the `green_ai_datacenter` dataset.
+
+---
+The following were already done before the steps in this document:
+
+  - PostgreSQL 17 installed on Windows.
+  - TimescaleDB 2.30.1 installed (files copied into lib and
+    share\extension).
+  - shared_preload_libraries = 'timescaledb' set in postgresql.conf.
+  - Extension registered in the postgres database.
+  - PostgreSQL service running on port 5432.
+  - Host machine LAN IP: 192.168.1.8
+
+This log picks up from there — the point where the green_ai_datacenter
+dataset needs to be loaded.
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+Everything needed to run this project on your own machine locally.
+------------------------------------------------------------------------
+1. PREREQUISITES
+------------------------------------------------------------------------
+
+Install these before anything else:
+
+  - PostgreSQL 17 for Windows
+      Download: https://www.postgresql.org/download/windows/
+      Installer will ask for a password for the "postgres" user —
+      REMEMBER IT.
+
+  - Microsoft Visual C++ Redistributable (2015-2022)
+      Download: https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+  - OpenSSL v3.x (required by TimescaleDB)
+      Download: https://slproweb.com/products/Win32OpenSSL.html
+      Pick the 64-bit v3.x installer.
+
+  - TimescaleDB Windows zip matching PostgreSQL 17
+      Download from the TimescaleDB GitHub releases page.
+      Pick the file named something like:
+        timescaledb-postgresql-17-windows-amd64.zip
+
+------------------------------------------------------------------------
+2. INSTALL TIMESCALEDB
+------------------------------------------------------------------------
+
+Step 1 — Stop PostgreSQL
+
+    Windows key -> Services -> postgresql-x64-17 -> Stop
+
+Step 2 — Extract the TimescaleDB zip
+
+    Right-click the zip -> Extract All.
+    You should end up with a folder containing:
+      setup.exe
+      timescaledb-2.30.1.dll
+      timescaledb-tsl-2.30.1.dll
+      timescaledb.dll
+      timescaledb.control
+      timescaledb-tune.exe
+      ~69 .sql files
+
+Step 3 — Add PostgreSQL to PATH
+
+    Windows key -> sysdm.cpl -> Advanced -> Environment Variables
+    Under SYSTEM variables, select Path -> Edit -> New
+    Add:
+        C:\Program Files\PostgreSQL\17\bin
+    OK on all dialogs.
+
+Step 4 — Open a NEW Administrator Command Prompt
+
+    Windows key -> cmd -> right-click -> Run as administrator.
+
+Step 5 — Verify PATH
+
+    pg_config
+
+    Should return output. If it says "not recognized", the PATH edit
+    didn't take — redo step 3.
+
+Step 6 — Run the TimescaleDB setup
+
+    cd "C:\path\to\extracted\timescaledb"
+    setup.exe
+
+    When prompted:
+      - Y to proceed
+      - Paste the config path:
+          C:\Program Files\PostgreSQL\17\data\postgresql.conf
+      - Y to update shared_preload_libraries
+      - n to skip timescaledb-tune (optional)
+
+Step 7 — If the setup fails with "Access is denied"
+
+    Manually copy the files from an Administrator Command Prompt:
+
+      copy "C:\path\to\extracted\timescaledb\*.dll" "C:\Program Files\PostgreSQL\17\lib\"
+      copy "C:\path\to\extracted\timescaledb\*.sql" "C:\Program Files\PostgreSQL\17\share\extension\"
+      copy "C:\path\to\extracted\timescaledb\timescaledb.control" "C:\Program Files\PostgreSQL\17\share\extension\"
+
+Step 8 — Start PostgreSQL
+
+    Windows key -> Services -> postgresql-x64-17 -> Start
+
+Step 9 — Enable the extension
+
+    psql -U postgres -p 5432 -d postgres -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+
+    Should print: CREATE EXTENSION
+
+Step 10 — Verify
+
+    psql -U postgres -p 5432 -d postgres -c "SELECT extname, extversion FROM pg_extension WHERE extname='timescaledb';"
+
+    Should print:
+        extname   | extversion
+    -------------+------------
+     timescaledb | 2.30.1
+
+------------------------------------------------------------------------
+3. LOAD THE DATASET
+------------------------------------------------------------------------
+
+Step 1 — Connect to psql
+
+    psql -U postgres -p 5432
+
+    Enter your password. You should land at: postgres=#
+
+------------------------------------------------------------------------
+4. TABLE CREATION
+------------------------------------------------------------------------
+
+WHERE: inside the psql prompt (postgres=#).
+
+    CREATE TABLE green_ai_datacenter (
+        records integer GENERATED ALWAYS AS IDENTITY,
+        server_type text,
+        cooling_type text,
+        datacenter_region text,
+        time_of_day text,
+        maintenance_status text,
+        energy_source_primary text,
+        server_age_years integer,
+        rack_u_position integer,
+        workload_intensity double precision,
+        cpu_utilization double precision,
+        gpu_utilization double precision,
+        memory_utilization double precision,
+        storage_utilization double precision,
+        disk_io_iops double precision,
+        network_throughput_gbps double precision,
+        network_latency_ms double precision,
+        virtual_machines_count integer,
+        ambient_temperature_c double precision,
+        humidity_percentage double precision,
+        inlet_temperature_c double precision,
+        exhaust_temperature_c double precision,
+        fan_speed_rpm double precision,
+        airflow_cfm double precision,
+        cooling_efficiency double precision,
+        power_supply_efficiency double precision,
+        ups_battery_health double precision,
+        power_consumption_kw double precision,
+        pue double precision,
+        wue double precision,
+        carbon_intensity_gco2_kwh double precision,
+        renewable_energy_ratio double precision,
+        carbon_emission_kg double precision,
+        compute_cost_usd double precision,
+        energy_efficiency_class text,
+        failure_risk_level text
+    );
+
+NOTES:
+  - records uses GENERATED ALWAYS AS IDENTITY — PostgreSQL auto-numbers
+    it 1, 2, 3, ...
+  - Column order matches the CSV so the load lines up.
+  - The records column is NOT present in the CSV.
+  - Types were chosen to match the CSV contents: text for string
+    columns, integer for whole numbers, double precision for decimals.
+
+RESULT: CREATE TABLE
+
+------------------------------------------------------------------------
+5. CSV LOAD
+------------------------------------------------------------------------
+
+WHERE: inside the same psql prompt.
+
+    \copy green_ai_datacenter (server_type, cooling_type,
+    datacenter_region, time_of_day, maintenance_status,
+    energy_source_primary, server_age_years, rack_u_position,
+    workload_intensity, cpu_utilization, gpu_utilization,
+    memory_utilization, storage_utilization, disk_io_iops,
+    network_throughput_gbps, network_latency_ms,
+    virtual_machines_count, ambient_temperature_c,
+    humidity_percentage, inlet_temperature_c, exhaust_temperature_c,
+    fan_speed_rpm, airflow_cfm, cooling_efficiency,
+    power_supply_efficiency, ups_battery_health, power_consumption_kw,
+    pue, wue, carbon_intensity_gco2_kwh, renewable_energy_ratio,
+    carbon_emission_kg, compute_cost_usd, energy_efficiency_class,
+    failure_risk_level)
+    FROM 'C:\Users\jo2kk\Downloads\green_ai_datacenter.csv'
+    WITH (FORMAT csv, HEADER true);
+
+NOTES:
+  - \copy (with backslash) reads the file FROM THE MACHINE RUNNING PSQL,
+    not from the server.
+  - The column list OMITS records so PostgreSQL generates it.
+  - HEADER true skips the CSV header row.
+  - The CSV path is the full path to the file on the local machine.
+
+RESULT: COPY 100000
+
+------------------------------------------------------------------------
+6. VERIFICATION QUERIES
+------------------------------------------------------------------------
+
+WHERE: inside the same psql prompt.
+
+Row count:
+
+    SELECT COUNT(*) FROM green_ai_datacenter;
+
+RESULT: 100000
+
+Spot-check that the identity column worked:
+
+    SELECT records, server_type, cpu_utilization
+    FROM green_ai_datacenter
+    ORDER BY records
+    LIMIT 5;
+
+RESULT:
+
+     records | server_type | cpu_utilization
+    ---------+-------------+-----------------
+           1 | Edge        |          46.498
+           2 | GPU         |          21.285
+           3 | Compute     |          52.201
+           4 | Compute     |          32.406
+           5 | GPU         |          27.067
+    (5 rows)
+
+WHAT THIS CONFIRMS: 100,000 rows loaded; the auto-generated records
+column numbered them 1 through 100,000, and values landed in the correct
+columns.
+
+------------------------------------------------------------------------
+7. NETWORK EXPOSURE FOR THE TEAM
+------------------------------------------------------------------------
+
+Two config files were edited to allow teammates on the LAN to connect.
+Both are in C:\Program Files\PostgreSQL\17\data\.
+
+FILE 1: postgresql.conf
+Find the line listen_addresses and change it to:
+
+    listen_addresses = '*'
+
+FILE 2: pg_hba.conf
+
+Add at the bottom:
+
+    host    all    all    192.168.1.0/24    md5
+
+THEN RESTART THE SERVICE:
+
+    Windows key -> Services -> postgresql-x64-17 -> Restart
+
+NOTES:
+  - listen_addresses = '*' tells PostgreSQL to accept connections on all
+    network interfaces, not just localhost.
+  - The pg_hba.conf line allows any user to connect to any database from
+    any machine in the 192.168.1.x range, using a password (md5).
+  - Never use trust for network connections — it means anyone on the LAN
+    can log in without a password.
+  - The service MUST be restarted for either change to take effect.
+
+------------------------------------------------------------------------
+8. FINAL ENVIRONMENT SUMMARY
+------------------------------------------------------------------------
+
+    Item                       | Value
+    ---------------------------+--------------------------------------
+    PostgreSQL version         | 17
+    PostgreSQL service name    | postgresql-x64-17
+    PostgreSQL port            | 5432
+    TimescaleDB version        | 2.30.1
+    Host machine LAN IP        | 192.168.1.8
+    Database                   | postgres
+    Table                      | green_ai_datacenter
+    Rows loaded                | 100,000
+    Columns                    | 38 (incl. auto records)
+    shared_preload_libraries   | 'timescaledb'
+    Extension installed        | yes (CREATE EXTENSION run)
+    Table type                 | regular table (not a hypertable)
+    Timestamp column           | none — required if converting to
+                               | hypertable
+    Team LAN range allowed     | 192.168.1.0/24
+
+------------------------------------------------------------------------
+9. CONNECTION STRING FOR TEAMMATES
+------------------------------------------------------------------------
+
+    postgresql://postgres:YOUR_PASSWORD@192.168.1.8:5432/postgres
+
+  - Port is 5432, not the default-adjacent 5434 that was used during
+    setup.
+  - Password is shared separately, not in this file.
+  - Table name for queries and connectors: green_ai_datacenter.
+
+## 1. Connection Details
+
+| Item           | Value                                              |
+|----------------|----------------------------------------------------|
+| Host           | `192.168.1.8` (LAN IP — update if it changes)      |
+| Port           | `5434`                                             |
+| Database       | `postgres`                                         |
+| User           | `postgres`                                         |
+| Password       | *(ask the DB owner — not stored in this repo)*     |
+| Table          | `green_ai_datacenter`                              |
+| Rows           | 100,000                                            |
+| TimescaleDB    | Installed (v2.30.1), but table is a regular table  |
+
+**Connection string (for Python, JDBC, etc.):**
+
+
+> The port is **5434**, not the default 5432. Do not omit it.
+
+---
+
+## 2. Table Schema
+
+The table has 38 columns. The first column, `records`, is auto-generated.
+
+| Column                     | Type              | Notes                          |
+|----------------------------|-------------------|--------------------------------|
+| `records`                  | integer           | Auto-generated (1 … 100,000)   |
+| `server_type`              | text              | Edge / GPU / Compute / Storage |
+| `cooling_type`             | text              | Air / Liquid / Hybrid          |
+| `datacenter_region`        | text              | EU / NA / APAC / ME            |
+| `time_of_day`              | text              | Night / Peak / Off-Peak        |
+| `maintenance_status`       | text              | Normal / Recent / Pending      |
+| `energy_source_primary`    | text              | Solar / Grid / Wind / Hydro    |
+| `server_age_years`         | integer           |                                |
+| `rack_u_position`          | integer           |                                |
+| `workload_intensity`       | double precision  |                                |
+| `cpu_utilization`          | double precision  |                                |
+| `gpu_utilization`          | double precision  |                                |
+| `memory_utilization`       | double precision  |                                |
+| `storage_utilization`      | double precision  |                                |
+| `disk_io_iops`             | double precision  |                                |
+| `network_throughput_gbps`  | double precision  |                                |
+| `network_latency_ms`       | double precision  |                                |
+| `virtual_machines_count`   | integer           |                                |
+| `ambient_temperature_c`    | double precision  |                                |
+| `humidity_percentage`      | double precision  |                                |
+| `inlet_temperature_c`      | double precision  |                                |
+| `exhaust_temperature_c`    | double precision  |                                |
+| `fan_speed_rpm`            | double precision  |                                |
+| `airflow_cfm`              | double precision  |                                |
+| `cooling_efficiency`       | double precision  |                                |
+| `power_supply_efficiency`  | double precision  |                                |
+| `ups_battery_health`       | double precision  |                                |
+| `power_consumption_kw`     | double precision  |                                |
+| `pue`                      | double precision  |                                |
+| `wue`                      | double precision  |                                |
+| `carbon_intensity_gco2_kwh`| double precision  |                                |
+| `renewable_energy_ratio`   | double precision  |                                |
+| `carbon_emission_kg`       | double precision  |                                |
+| `compute_cost_usd`         | double precision  |                                |
+| `energy_efficiency_class`  | text              | High / Medium / Low            |
+| `failure_risk_level`       | text              | Low / Medium / High            |
+
+> `records` is `GENERATED ALWAYS AS IDENTITY`. Do **not** insert a value into
+> it — PostgreSQL fills it automatically.
+
+---
+
+## 3. For the Kafka Engineer
+
+You are producing/consuming messages that will be written to the
+`green_ai_datacenter` table (or read from it).
+
+- **Do not include the `records` column** in anything you send. It is managed by PostgreSQL.
+- Your JDBC sink connector will need:
+  - `connection.url` → `jdbc:postgresql://192.168.1.8:5434/postgres`
+  - `connection.user` → `postgres`
+  - `connection.password` → *(get from DB owner)*
+- Kafka Connect JDBC sink does **not** support `GENERATED ALWAYS AS IDENTITY` in
+  `insert.mode=upsert` cleanly. Use `insert.mode=insert` if you are only adding
+  new rows, or drop the identity behaviour if you need upserts.
+- The table name for the connector is `green_ai_datacenter`.
+
+---
+
+## 4. For the Visualisation Engineer
+
+You only need **read access**.
+
+- Connect your tool (Confluent, Metabase, Grafana, Tableau, whatever) using the
+  connection string in section 1.
+- Example starting query:
+  ```sql
+  SELECT *
+  FROM green_ai_datacenter
+  ORDER BY records
+  LIMIT 100;
+
+Useful syntax query to do own test.
+-- Average PUE by region
+SELECT datacenter_region, AVG(pue) AS avg_pue
+FROM green_ai_datacenter
+GROUP BY datacenter_region;
+
+-- Carbon emissions by energy source
+SELECT energy_source_primary, SUM(carbon_emission_kg) AS total_kg
+FROM green_ai_datacenter
+GROUP BY energy_source_primary;
+
