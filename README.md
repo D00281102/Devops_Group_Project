@@ -1274,3 +1274,20 @@ SELECT energy_source_primary, SUM(carbon_emission_kg) AS total_kg
 FROM green_ai_datacenter
 GROUP BY energy_source_primary;
 
+
+---
+
+# Kafka to Database Integration
+
+The Kafka to Database component reads sensor messages from the Kafka topic and stores them in PostgreSQL.
+
+The current flow is:
+
+```text
+Kafka topic: sensor-telemetry
+        ↓
+kafka_to_database.py
+        ↓
+JSON sensor data
+        ↓
+PostgreSQL / TimescaleDB
