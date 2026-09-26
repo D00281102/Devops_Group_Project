@@ -35,7 +35,7 @@ print("Waiting for sensor data...")
 for message in consumer:
     try:
         # Convert Kafka message bytes into JSON
-        raw_value = message.value.decode("utf-8"
+        raw_value = message.value.decode("utf-8")
         data = json.loads(raw_value)
        
 
