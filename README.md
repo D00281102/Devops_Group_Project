@@ -70,4 +70,15 @@ You are producing/consuming messages that will be written to the
 
 ---
 
+## 4. For the Visualisation Engineer
 
+You only need **read access**.
+
+- Connect your tool (Confluent, Metabase, Grafana, Tableau, whatever) using the
+  connection string in section 1.
+- Example starting query:
+  ```sql
+  SELECT *
+  FROM iot_telemetry_data
+  ORDER BY records
+  LIMIT 100;
