@@ -21,3 +21,32 @@ database that holds the `iot_telemetry_data` dataset.
 | TimescaleDB    | Installed (v2.30.1), but table is a regular table  |
 
 **Connection string (for Python, JDBC, etc.):**
+
+> The port is **5434**, not the default 5432. Do not omit it.
+
+---
+
+## 2. Table Schema
+
+The table has 10 columns. The first column, `records`, is auto-generated.
+
+| Column     | Type              | Notes                                    |
+|------------|-------------------|------------------------------------------|
+| `records`  | integer           | Auto-generated (1 … 405,184)             |
+| `ts`       | double precision  | Unix timestamp (seconds, with decimals)  |
+| `device`   | text              | MAC address of the sensor                |
+| `co`       | double precision  | Carbon monoxide reading                  |
+| `humidity` | double precision  | Humidity percentage                      |
+| `light`    | boolean           | true / false                             |
+| `lpg`      | double precision  | LPG reading                              |
+| `motion`   | boolean           | true / false                             |
+| `smoke`    | double precision  | Smoke reading                            |
+| `temp`     | double precision  | Temperature in Celsius                   |
+
+> `records` is `GENERATED ALWAYS AS IDENTITY`. Do **not** insert a value into
+> it — PostgreSQL fills it automatically.
+
+> `ts` is a Unix epoch timestamp, not a date type. Convert it in SQL with
+> `to_timestamp(ts)` if you need a readable date.
+
+---
