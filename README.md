@@ -95,7 +95,6 @@ network. There is no VPN involved.
 
 ========================================================================
 5A. WHAT THE DB OWNER DOES
-========================================================================
 
 STEP 1 — Find your current campus Wi-Fi IP
 
@@ -185,7 +184,7 @@ STEP 6 — Send your teammates the connection details
 
 ========================================================================
 5B. WHAT THE TEAMMATES DO
-========================================================================
+
 
 STEP 1 — Connect to the same campus Wi-Fi as the DB host
 
