@@ -50,3 +50,24 @@ The table has 10 columns. The first column, `records`, is auto-generated.
 > `to_timestamp(ts)` if you need a readable date.
 
 ---
+
+## 3. For the Kafka Engineer
+
+You are producing/consuming messages that will be written to the
+`iot_telemetry_data` table (or read from it).
+
+- **Do not include the `records` column** in anything you send. It is managed by PostgreSQL.
+- Your JDBC sink connector will need:
+  - `connection.url` → `jdbc:postgresql://192.168.1.8:5434/postgres` - check Connections details again if url is not working
+  - `connection.user` → `postgres`
+  - `connection.password` → *(get from DB owner)*
+- Kafka Connect JDBC sink does **not** support `GENERATED ALWAYS AS IDENTITY` in
+  `insert.mode=upsert` cleanly. Use `insert.mode=insert` if you are only adding
+  new rows, or drop the identity behaviour if you need upserts.
+- The table name for the connector is `iot_telemetry_data`.
+- The `light` and `motion` columns are **boolean**. Make sure your Kafka
+  schema treats them as such, or the insert will fail.
+
+---
+
+
