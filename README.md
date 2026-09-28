@@ -56,9 +56,9 @@ The table has 10 columns. The first column, `records`, is auto-generated.
 You are producing/consuming messages that will be written to the
 `iot_telemetry_data` table (or read from it).
 
-- **Do not include the `records` column** in anything you send. It is managed by PostgreSQL.
+- **Do not include the `records` column** in anything you send. PostgreSQL manages it.
 - Your JDBC sink connector will need:
-  - `connection.url` → `jdbc:postgresql://192.168.1.8:5434/postgres` - check Connections details again if url is not working
+  - `connection.url` → `jdbc:postgresql://192.168.1.8:5434/postgres` - check connection details again if the URL is not working
   - `connection.user` → `postgres`
   - `connection.password` → *(get from DB owner)*
 - Kafka Connect JDBC sink does **not** support `GENERATED ALWAYS AS IDENTITY` in
@@ -67,6 +67,9 @@ You are producing/consuming messages that will be written to the
 - The table name for the connector is `iot_telemetry_data`.
 - The `light` and `motion` columns are **boolean**. Make sure your Kafka
   schema treats them as such, or the insert will fail.
+
+- Test by sending one message and querying the table from psql:
+   SELECT * FROM iot_telemetry_data ORDER BY records DESC LIMIT 5;
 
 ---
 
@@ -82,3 +85,64 @@ You only need **read access**.
   FROM iot_telemetry_data
   ORDER BY records
   LIMIT 100;
+
+------------------------------------------------------------------------
+5. FOR EVERYONE ELSE (CONNECTIVITY REFERENCE — COLLEGE NETWORK ONLY)
+------------------------------------------------------------------------
+
+IMPORTANT: This setup only works when everyone is physically in
+college, connected to the same campus network. If you are at home,
+on a phone hotspot, or on any other network, you will not be able to
+reach the database. In that case, contact the DB owner — the
+connection method changes and a private VPN (Tailscale) would be
+needed instead.
+
+BEFORE YOU TRY TO CONNECT
+
+  1. Make sure you are in college and connected to the same campus
+     WiFi or wired network as the DB host. Do not try this from home.
+  2. Ask the DB owner for two things:
+        - The host machine's campus LAN IP address (looks like 192.168.x.x)
+        - The postgres password
+
+CONNECTION DETAILS
+
+    Item           | Value
+    ---------------+--------------------------------------------------
+    Host           | The DB host's LAN IP (e.g. 192.168.1.8)
+    Port           | 5434
+    Database       | postgres
+    User           | postgres
+    Password       | (ask the DB owner)
+    Table          | iot_telemetry_data
+
+Connection string:
+
+    postgresql://postgres:YOUR_PASSWORD@<LAN_IP>:5434/postgres
+
+Test from your terminal:
+
+    psql -h <LAN_IP> -p 5434 -U postgres
+
+IF IT TIMES OUT
+
+  - Confirm you are actually in college and on the campus network,
+    not tethered to a phone or on a home connection.
+  - Confirm you are on the same subnet as the DB host. Ask the DB
+    owner to run ipconfig on their machine and compare the first
+    three numbers of your IP and theirs.
+  - Ping the host machine first:
+
+        ping <LAN_IP>
+
+    If the ping fails while you are on campus, the campus network
+    is likely blocking device-to-device traffic (common on
+    college WiFi). In that case, tell the DB owner — the solution
+    is a wired connection, a shared phone hotspot, or installing
+    Tailscale as a fallback.
+
+  - If ping works but psql still fails, the DB host's firewall or
+    pg_hba.conf is not allowing your IP. Tell the DB owner so they
+    can add your campus IP range to the allowed list.
+
+
