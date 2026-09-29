@@ -93,6 +93,7 @@ The dashboard was created as an initial test before connecting Grafana to the pr
 
 **5. Dashboard Testing**
 
+
 The Grafana TestData data source was used to generate test data and verify the dashboard.
 
 The test confirmed that:
@@ -107,38 +108,43 @@ The TestData source was only used for testing the Grafana visualisation function
 
 It does not represent the project's actual sensor dataset.
 
+
+
 **6. Local PostgreSQL Testing**
+
 
 A local PostgreSQL database was set up to test the Grafana database connection before using the project's shared database.
 
 PostgreSQL version tested:
 
-PostgreSQL 17.11
+- PostgreSQL 17.11
 
 The local PostgreSQL server used:
 
-localhost:5432
+- localhost:5432
 
 The PostgreSQL service can be checked in PowerShell using:
 
-Get-Service *postgres*
+- Get-Service *postgres*
 
 The PostgreSQL service should show a status of:
 
-Running
+- Running
 
 The PostgreSQL port was also tested using:
 
-Test-NetConnection localhost -Port 5432
+- Test-NetConnection localhost -Port 5432
 
 The test was successful when:
 
-TcpTestSucceeded : True
+- TcpTestSucceeded : True
+
+
 **7. Creating the Dummy Sensor Table**
 
 A local PostgreSQL table was created for testing Grafana with dummy sensor data.
 
-The table was called:
+- The table was called:
 
 dummy_sensor_data
 
@@ -159,21 +165,23 @@ CREATE TABLE dummy_sensor_data (
 
 The table contains the following sensor fields:
 
-id
-ts
-device
-temp
-humidity
-light
-co
-lpg
-motion
-smoke
+- id
+- ts
+- device
+- temp
+- humidity
+- light
+- co
+- lpg
+- motion
+- smoke
+
+
 **8. Inserting Dummy Sensor Data**
 
 Five dummy sensor readings were inserted into the local PostgreSQL table.
 
-The following SQL was used:
+- The following SQL was used:
 
 INSERT INTO dummy_sensor_data
 (ts, device, temp, humidity, light, co, lpg, motion, smoke)
@@ -187,9 +195,11 @@ VALUES
 The insert was successful when PostgreSQL returned:
 
 INSERT 0 5
+
+
 **9. Checking the Dummy Data**
 
-The inserted data was checked using:
+- The inserted data was checked using:
 
 SELECT *
 FROM dummy_sensor_data
@@ -207,18 +217,19 @@ The temperature values used for the test were:
 
 This confirmed that the dummy sensor data was stored correctly in PostgreSQL.
 
+
 **10. Connecting Grafana to PostgreSQL**
 
 Grafana was connected to the local PostgreSQL database using the PostgreSQL data source.
 
-The Grafana PostgreSQL connection used:
+- The Grafana PostgreSQL connection used:
 
-Host: host.docker.internal:5432
-Database: postgres
-Username: postgres
-Password: admin
-SSL Mode: disable
-PostgreSQL Version: 17
+- Host: host.docker.internal:5432
+- Database: postgres
+- Username: postgres
+- Password: admin
+- SSL Mode: disable
+- PostgreSQL Version: 17
 
 The password is included here only to document the local test setup. The local database used a test password and this should not be used for a shared or production database.
 
@@ -228,11 +239,12 @@ Database Connection OK
 
 This confirmed that Grafana could communicate with the local PostgreSQL database.
 
+
 **11. Querying PostgreSQL Data from Grafana**
 
 The PostgreSQL data source was selected in Grafana Explore.
 
-The following SQL query was used:
+- The following SQL query was used:
 
 SELECT
     ts AS "time",
@@ -254,21 +266,23 @@ to:
 
 This confirmed that Grafana could read data from PostgreSQL and display it as a visualisation.
 
+
 **12. Creating the Grafana Dashboard**
 
 The working PostgreSQL query was added to a Grafana dashboard.
 
 The dashboard was named:
 
-IoT Sensor Data Dashboard
+- IoT Sensor Data Dashboard
 
 The panel was named:
 
-Temperature Readings
+- Temperature Readings
 
 The panel displayed the five dummy PostgreSQL temperature readings as a time-series graph.
 
 The dashboard was saved successfully.
+
 
 **13. Dashboard Verification**
 
@@ -282,21 +296,22 @@ panel continued to display the PostgreSQL dummy data.
 
 This confirmed that the dashboard was saved correctly and was still working after a refresh.
 
-**Grafana installed using Docker.
-Grafana accessed through port 3000.
-Grafana version 13.2.2 tested.
-Grafana TestData data source tested.
-Initial Grafana test dashboard created.
-PostgreSQL 17.11 installed locally.
-PostgreSQL service verified as running.
-PostgreSQL port 5432 tested successfully.
-Local dummy_sensor_data table created.
-Five dummy sensor readings inserted.
-Dummy sensor data verified using SQL.
-Grafana PostgreSQL data source configured.
-Grafana successfully connected to local PostgreSQL.
-PostgreSQL sensor data queried from Grafana.
-Temperature data displayed as a time-series graph.
-IoT Sensor Data Dashboard created and saved.
-Temperature Readings panel created.
-Dashboard refreshed and verified successfully.**
+
+- Grafana installed using Docker.
+- Grafana accessed through port 3000.
+- Grafana version 13.2.2 tested.
+- Grafana TestData data source tested.
+- Initial Grafana test dashboard created.
+- PostgreSQL 17.11 installed locally.
+- PostgreSQL service verified as running.
+- PostgreSQL port 5432 tested successfully.
+- Local `dummy_sensor_data` table created.
+- Five dummy sensor readings inserted.
+- Dummy sensor data verified using SQL.
+- Grafana PostgreSQL data source configured.
+- Grafana successfully connected to local PostgreSQL.
+- PostgreSQL sensor data queried from Grafana.
+- Temperature data displayed as a time-series graph.
+- IoT Sensor Data Dashboard created and saved.
+- Temperature Readings panel created.
+- Dashboard refreshed and verified successfully.
