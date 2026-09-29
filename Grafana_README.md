@@ -24,27 +24,43 @@ PostgreSQL / TimescaleDB
 Grafana
 
 
-2. Grafana Installation
+2. The Grafana Docker image used was:
 
-Grafana was installed using Docker.
-
-The Docker image used was:
-
+```text
 grafana/grafana:latest
+```
+
+The following command was used to create and run the Grafana container:
+
+```powershell
+docker run -d --name grafana -p 3000:3000 grafana/grafana:latest
+```
 
 The container was created with Grafana exposed on port 3000.
 
 The container was named:
 
+```text
 grafana
+```
 
 Grafana was accessed locally through:
 
+```text
 http://localhost:3000
+```
 
 The Grafana version tested during the project was:
 
+```text
 Grafana 13.2.2
+```
+
+The Docker container was later stopped when it was no longer needed for testing. The container can be started again using:
+
+```powershell
+docker start grafana
+```
 
 
 3. Grafana Testing
