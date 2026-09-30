@@ -5,7 +5,7 @@ import paho.mqtt.client as mqtt
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 SENSOR_TOPIC = "sensors/telemetry"
-
+ACTUATOR_TOPIC = "actuators/commands"
 
 def on_connect(client, userdata, flags, reason_code, properties):
     """
@@ -18,43 +18,76 @@ def on_connect(client, userdata, flags, reason_code, properties):
 
 def evaluate_sensor_data(sensor_data):
     """
-    Evaluate sensor readings and generate control decisions.
+    Evaluate sensor readings and generate actuator commands.
     """
-    decisions = []
+    commands = []
 
     if sensor_data["temp"] >= 25:
-        decisions.append("FAN ON - High temperature detected")
+        commands.append({
+            "actuator": "fan",
+            "action": "ON",
+            "reason": "High temperature detected"
+        })
 
     if sensor_data["humidity"] >= 70:
-        decisions.append("DEHUMIDIFIER ON - High humidity detected")
+        commands.append({
+            "actuator": "dehumidifier",
+            "action": "ON",
+            "reason": "High humidity detected"
+        })
 
     if sensor_data["light"]:
-        decisions.append("LIGHT DETECTED")
+        commands.append({
+            "actuator": "light",
+            "action": "ON",
+            "reason": "Light detected"
+        })
 
-    return decisions
+    return commands
+
+def publish_actuator_command(client, command):
+    """
+    Publish an actuator command to the MQTT broker.
+    """
+    payload = json.dumps(command)
+
+    client.publish(
+        ACTUATOR_TOPIC,
+        payload
+    )
+
+    print(f"Published actuator command to: {ACTUATOR_TOPIC}")
+    print(json.dumps(command, indent=4))
 
 
 def on_message(client, userdata, message):
     """
-    Receive and decode sensor messages from MQTT.
+    Receive sensor data, evaluate it and publish actuator commands.
     """
     try:
         sensor_data = json.loads(message.payload.decode("utf-8"))
 
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
-        decisions = evaluate_sensor_data(sensor_data)
 
-        if decisions:
+        commands = evaluate_sensor_data(sensor_data)
+
+        if commands:
             print("Control decisions:")
 
-            for decision in decisions:
-                print(f"- {decision}")
+            for command in commands:
+                print(
+                    f"- {command['actuator'].upper()} "
+                    f"{command['action']} - {command['reason']}"
+                )
+
+                publish_actuator_command(client, command)
+
         else:
             print("Control decision: No action required")
 
         print()
-        
+
     except json.JSONDecodeError:
             print("Error: Received message is not valid JSON.")
 
