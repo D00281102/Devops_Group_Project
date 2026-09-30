@@ -1,4 +1,5 @@
 import csv
+from datetime import datetime
 
 DATA_FILE = "Prototype/data/iot_telemetry_data.csv"
 
@@ -9,6 +10,9 @@ co_readings = []
 # Store readings separately for each sensor device
 device_data = {}
 
+# Store readings separately for each day
+daily_data = {}
+
 with open(DATA_FILE, "r", newline="") as file:
     reader = csv.DictReader(file)
 
@@ -17,11 +21,13 @@ with open(DATA_FILE, "r", newline="") as file:
         humidity = float(row["humidity"])
         co = float(row["co"])
         device = row["device"]
+        timestamp = float(row["ts"])
 
         temperatures.append(temperature)
         humidities.append(humidity)
         co_readings.append(co)
 
+        # Per-device data
         if device not in device_data:
             device_data[device] = {
                 "temperatures": [],
@@ -30,6 +36,18 @@ with open(DATA_FILE, "r", newline="") as file:
 
         device_data[device]["temperatures"].append(temperature)
         device_data[device]["humidities"].append(humidity)
+
+        # Convert Unix timestamp into a date
+        date = datetime.fromtimestamp(timestamp).date()
+
+        if date not in daily_data:
+            daily_data[date] = {
+                "temperatures": [],
+                "humidities": []
+            }
+
+        daily_data[date]["temperatures"].append(temperature)
+        daily_data[date]["humidities"].append(humidity)
 
 # Temperature analytics
 average_temp = sum(temperatures) / len(temperatures)
@@ -87,4 +105,22 @@ for device, readings in device_data.items():
     print(f"Readings: {len(device_temperatures)}")
     print(f"Average temperature: {average_device_temp:.2f} °C")
     print(f"Average humidity: {average_device_humidity:.2f} %")
+    print()
+
+print("Daily Sensor Trends")
+print("-------------------")
+
+for date in sorted(daily_data):
+    readings = daily_data[date]
+
+    daily_temperatures = readings["temperatures"]
+    daily_humidities = readings["humidities"]
+
+    average_daily_temp = sum(daily_temperatures) / len(daily_temperatures)
+    average_daily_humidity = sum(daily_humidities) / len(daily_humidities)
+
+    print(f"Date: {date}")
+    print(f"Readings: {len(daily_temperatures)}")
+    print(f"Average temperature: {average_daily_temp:.2f} °C")
+    print(f"Average humidity: {average_daily_humidity:.2f} %")
     print()
