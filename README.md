@@ -419,7 +419,7 @@ $body = @{
           "confluent.topic.bootstrap.servers" = "localhost:9092"
           "confluent.topic.replication.factor" = "1"
           "key.converter" = "org.apache.kafka.connect.storage.StringConverter"
-          "value.converter" = "org.apache.kafka.connect.storage.StringConverter"
+          "value.converter" = "org.apache.kafka.connect.storage.ByteArrayConverter"
      }
 } | ConvertTo-Json -Depth 5
 
