@@ -78,15 +78,14 @@ Prototype/data/
 The relevant project structure is:
 
 ```text
-Devops_Group_Project/
-│
 ├── Prototype/
 │   ├── data/
 │   │   └── iot_telemetry_data.csv
 │   │
 │   ├── Data_Sensor.py
+│   ├── Control_Logic.py
+│   ├── Actuator_Simulator.py
 │   └── requirements.txt
-│
 ├── .gitignore
 └── README.md
 ```
@@ -848,3 +847,725 @@ Eclipse Mosquitto MQTT Broker
 MQTT Subscriber / Project Integration
 ```
 
+---
+
+# MQTT Control Logic and Actuator Simulator
+
+## Overview
+
+The IoT prototype has been extended to include a control component and an actuator simulator.
+
+The control component receives the JSON sensor readings published by `Data_Sensor.py` through MQTT. It evaluates the incoming sensor values using predefined control rules and determines whether an actuator action is required.
+
+When a control rule is triggered, the control component creates a structured JSON actuator command and publishes it to a second MQTT topic.
+
+The actuator simulator subscribes to this topic, receives the command and simulates the requested actuator action.
+
+The complete control flow is:
+
+```text
+IoT Telemetry CSV Dataset
+        ↓
+Data_Sensor.py
+        ↓
+JSON Sensor Reading
+        ↓
+MQTT Broker (Eclipse Mosquitto)
+        ↓
+sensors/telemetry
+        ↓
+Control_Logic.py
+        ↓
+Control Rules
+        ↓
+JSON Actuator Command
+        ↓
+MQTT Broker (Eclipse Mosquitto)
+        ↓
+actuators/commands
+        ↓
+Actuator_Simulator.py
+        ↓
+Simulated Actuator Action
+```
+
+The MQTT broker is currently running locally for prototype testing.
+
+---
+
+# Control Logic
+
+The control logic is located at:
+
+```text
+Prototype/Control_Logic.py
+```
+
+The control component connects to the local Eclipse Mosquitto MQTT broker using:
+
+```text
+Broker: localhost
+Port: 1883
+Sensor Topic: sensors/telemetry
+Actuator Topic: actuators/commands
+```
+
+The control component subscribes to:
+
+```text
+sensors/telemetry
+```
+
+This is the same MQTT topic used by `Data_Sensor.py` to publish the simulated IoT sensor readings.
+
+---
+
+## How the Control Logic Works
+
+For every sensor reading received through MQTT, the control component performs the following steps:
+
+1. Receives a message from `sensors/telemetry`.
+2. Decodes the MQTT message payload.
+3. Converts the JSON payload into Python data.
+4. Reads the sensor values contained in the message.
+5. Evaluates the sensor values against the configured control rules.
+6. Determines whether an actuator action is required.
+7. Creates a structured actuator command when a rule is triggered.
+8. Converts the actuator command into JSON.
+9. Publishes the command to `actuators/commands`.
+10. Displays the control decision in the terminal.
+
+If none of the configured control conditions are met, the program displays:
+
+```text
+Control decision: No action required
+```
+
+---
+
+# Control Rules
+
+The current prototype uses three control rules.
+
+```text
+Temperature >= 25°C  → Fan ON
+
+Humidity >= 70%      → Dehumidifier ON
+
+Light = True         → Light ON
+```
+
+These thresholds are used to demonstrate how incoming IoT sensor readings can automatically produce control actions.
+
+A single sensor reading can trigger more than one actuator.
+
+For example, a reading containing:
+
+```text
+Temperature: 27°C
+Humidity: 77%
+Light: True
+```
+
+will trigger:
+
+```text
+Fan ON
+Dehumidifier ON
+Light ON
+```
+
+A reading that does not meet any of the configured conditions will return:
+
+```text
+No action required
+```
+
+---
+
+# Running the Control Logic
+
+Before running the control logic, make sure:
+
+1. Eclipse Mosquitto is running.
+2. The `paho-mqtt` Python package has been installed.
+3. `Control_Logic.py` exists inside the `Prototype` directory.
+
+From the root directory of the project, run:
+
+```powershell
+py Prototype/Control_Logic.py
+```
+
+Alternatively, change into the `Prototype` directory:
+
+```powershell
+cd Prototype
+```
+
+Then run:
+
+```powershell
+python Control_Logic.py
+```
+
+---
+
+# Expected Control Logic Output
+
+When the control component starts successfully, the terminal should display:
+
+```text
+Starting IoT control logic...
+Connected to MQTT broker: localhost:1883
+Subscribed to MQTT topic: sensors/telemetry
+Waiting for sensor readings...
+```
+
+The program will then wait for sensor readings to be published.
+
+Start `Data_Sensor.py` in another terminal.
+
+When a sensor reading is received, the control terminal should display:
+
+```text
+Sensor reading received:
+{
+    ...
+}
+```
+
+If the sensor reading does not trigger a configured rule, the terminal should display:
+
+```text
+Control decision: No action required
+```
+
+If a control rule is triggered, the terminal should display the control decision.
+
+For example:
+
+```text
+Control decisions:
+- FAN ON - High temperature detected
+Published actuator command to: actuators/commands
+```
+
+If several rules are triggered by the same sensor reading, multiple actuator commands are generated.
+
+For example:
+
+```text
+Control decisions:
+- FAN ON - High temperature detected
+Published actuator command to: actuators/commands
+
+- DEHUMIDIFIER ON - High humidity detected
+Published actuator command to: actuators/commands
+
+- LIGHT ON - Light detected
+Published actuator command to: actuators/commands
+```
+
+This confirms that the sensor data has successfully passed from the sensor simulator through MQTT to the control component.
+
+---
+
+# Actuator Command Format
+
+When a control rule is triggered, the control component creates a structured JSON actuator command.
+
+Each command contains:
+
+- `actuator` - The actuator that should respond.
+- `action` - The action the actuator should perform.
+- `reason` - The sensor condition that caused the action.
+
+For example, a high temperature reading produces:
+
+```json
+{
+    "actuator": "fan",
+    "action": "ON",
+    "reason": "High temperature detected"
+}
+```
+
+A high humidity reading can produce:
+
+```json
+{
+    "actuator": "dehumidifier",
+    "action": "ON",
+    "reason": "High humidity detected"
+}
+```
+
+A light reading can produce:
+
+```json
+{
+    "actuator": "light",
+    "action": "ON",
+    "reason": "Light detected"
+}
+```
+
+These commands are published to:
+
+```text
+actuators/commands
+```
+
+The sensor readings and actuator commands therefore use separate MQTT topics:
+
+```text
+Sensor Data:
+sensors/telemetry
+
+Actuator Commands:
+actuators/commands
+```
+
+---
+
+# Actuator Simulator
+
+The actuator simulator is located at:
+
+```text
+Prototype/Actuator_Simulator.py
+```
+
+The purpose of the actuator simulator is to represent physical IoT actuators during prototype testing.
+
+No physical fan, dehumidifier or light is required.
+
+Instead, the Python program receives the MQTT actuator command and displays the simulated action in the terminal.
+
+The current simulated actuators are:
+
+```text
+Fan
+Dehumidifier
+Light
+```
+
+---
+
+# How the Actuator Simulator Works
+
+The actuator simulator performs the following steps:
+
+1. Connects to the local Eclipse Mosquitto MQTT broker.
+2. Subscribes to `actuators/commands`.
+3. Waits for actuator commands.
+4. Receives the JSON MQTT message.
+5. Decodes the JSON command.
+6. Reads the actuator, action and reason.
+7. Determines which simulated actuator should respond.
+8. Displays the requested action in the terminal.
+
+The actuator simulator continues listening for commands until it is manually stopped.
+
+---
+
+# Running the Actuator Simulator
+
+Before running the actuator simulator, make sure the Mosquitto MQTT broker is running.
+
+From the root directory of the project, run:
+
+```powershell
+py Prototype/Actuator_Simulator.py
+```
+
+Alternatively, change into the `Prototype` directory:
+
+```powershell
+cd Prototype
+```
+
+Then run:
+
+```powershell
+python Actuator_Simulator.py
+```
+
+---
+
+# Expected Actuator Simulator Output
+
+When the actuator simulator starts successfully, the terminal should display:
+
+```text
+Starting IoT actuator simulator...
+Connected to MQTT broker: localhost:1883
+Subscribed to MQTT topic: actuators/commands
+Waiting for actuator commands...
+```
+
+The program will remain running while it waits for commands from `Control_Logic.py`.
+
+When an actuator command is received, output similar to the following should appear:
+
+```text
+Actuator command received:
+Actuator: fan
+Action: ON
+Reason: High temperature detected
+Simulated Fan: ON
+```
+
+A dehumidifier command should display:
+
+```text
+Actuator command received:
+Actuator: dehumidifier
+Action: ON
+Reason: High humidity detected
+Simulated Dehumidifier: ON
+```
+
+A light command should display:
+
+```text
+Actuator command received:
+Actuator: light
+Action: ON
+Reason: Light detected
+Simulated Light: ON
+```
+
+This confirms that the actuator command was successfully published by the control component, passed through MQTT and received by the actuator simulator.
+
+---
+
+# Running the Complete Sensor-to-Actuator Pipeline
+
+The complete pipeline requires three Python components to run at the same time.
+
+Mosquitto must also be running.
+
+Use three separate PowerShell or VS Code terminals.
+
+Start the components in the following order.
+
+## Step 1 - Start the Actuator Simulator
+
+In the first terminal, from the root of the project run:
+
+```powershell
+py Prototype/Actuator_Simulator.py
+```
+
+Look for:
+
+```text
+Starting IoT actuator simulator...
+Connected to MQTT broker: localhost:1883
+Subscribed to MQTT topic: actuators/commands
+Waiting for actuator commands...
+```
+
+Leave this terminal running.
+
+---
+
+## Step 2 - Start the Control Logic
+
+In the second terminal run:
+
+```powershell
+py Prototype/Control_Logic.py
+```
+
+Look for:
+
+```text
+Starting IoT control logic...
+Connected to MQTT broker: localhost:1883
+Subscribed to MQTT topic: sensors/telemetry
+Waiting for sensor readings...
+```
+
+Leave this terminal running.
+
+---
+
+## Step 3 - Start the Sensor Simulator
+
+In the third terminal run:
+
+```powershell
+py Prototype/Data_Sensor.py
+```
+
+Look for:
+
+```text
+Connected to MQTT broker: localhost:1883
+Starting IoT sensor simulation...
+```
+
+The sensor simulator should begin publishing readings to:
+
+```text
+sensors/telemetry
+```
+
+---
+
+# What to Look For During the End-to-End Test
+
+The three terminals demonstrate the different stages of the IoT pipeline.
+
+## Sensor Terminal
+
+The sensor terminal should display:
+
+```text
+Published to MQTT topic: sensors/telemetry
+```
+
+followed by the JSON sensor reading.
+
+This confirms:
+
+```text
+CSV Dataset
+    ↓
+Data_Sensor.py
+    ↓
+MQTT
+```
+
+---
+
+## Control Terminal
+
+The control terminal should display:
+
+```text
+Sensor reading received:
+```
+
+followed by the JSON sensor data.
+
+The terminal should then display either:
+
+```text
+Control decision: No action required
+```
+
+or one or more triggered control decisions.
+
+For example:
+
+```text
+Control decisions:
+- FAN ON - High temperature detected
+Published actuator command to: actuators/commands
+```
+
+This confirms:
+
+```text
+MQTT Sensor Data
+      ↓
+Control_Logic.py
+      ↓
+Control Rules
+      ↓
+MQTT Actuator Command
+```
+
+---
+
+## Actuator Terminal
+
+When an actuator command is generated, the actuator terminal should display:
+
+```text
+Actuator command received:
+```
+
+followed by the actuator information.
+
+For example:
+
+```text
+Actuator: fan
+Action: ON
+Reason: High temperature detected
+Simulated Fan: ON
+```
+
+This confirms:
+
+```text
+MQTT Actuator Command
+        ↓
+Actuator_Simulator.py
+        ↓
+Simulated Action
+```
+
+---
+
+# Complete Data Flow
+
+When all three components are working correctly, the complete prototype flow is:
+
+```text
+IoT Telemetry CSV Dataset
+          ↓
+     Data_Sensor.py
+          ↓
+   JSON Sensor Reading
+          ↓
+ MQTT: sensors/telemetry
+          ↓
+ Eclipse Mosquitto
+          ↓
+    Control_Logic.py
+          ↓
+      Control Rules
+          ↓
+ JSON Actuator Command
+          ↓
+MQTT: actuators/commands
+          ↓
+ Eclipse Mosquitto
+          ↓
+ Actuator_Simulator.py
+          ↓
+ Simulated Fan / Dehumidifier / Light
+```
+
+---
+
+# Control and Actuator Troubleshooting
+
+## Control Logic Waiting for Sensor Readings
+
+If `Control_Logic.py` displays:
+
+```text
+Waiting for sensor readings...
+```
+
+but nothing else appears, make sure `Data_Sensor.py` is running.
+
+The sensor simulator must publish messages to:
+
+```text
+sensors/telemetry
+```
+
+The control component will remain waiting until a sensor message is received.
+
+---
+
+## Actuator Simulator Waiting for Commands
+
+If `Actuator_Simulator.py` displays:
+
+```text
+Waiting for actuator commands...
+```
+
+this does not necessarily indicate an error.
+
+The actuator simulator only receives a message when one of the configured control rules is triggered.
+
+For example:
+
+```text
+Temperature >= 25°C
+Humidity >= 70%
+Light = True
+```
+
+If the sensor reading does not meet any of these conditions, no actuator command will be published.
+
+---
+
+## No Action Required
+
+If the control terminal displays:
+
+```text
+Control decision: No action required
+```
+
+the system is working correctly.
+
+This means the sensor message was successfully received but none of the configured control thresholds were reached.
+
+---
+
+## MQTT Connection Refused
+
+If either Python component cannot connect to:
+
+```text
+localhost:1883
+```
+
+check that Eclipse Mosquitto is running.
+
+The MQTT broker must be available before starting the sensor, control or actuator components.
+
+---
+
+## KeyboardInterrupt When Stopping
+
+`Control_Logic.py` and `Actuator_Simulator.py` continuously listen for MQTT messages.
+
+They can be stopped manually using:
+
+```text
+Ctrl+C
+```
+
+A `KeyboardInterrupt` message may appear when the program is stopped manually.
+
+This is caused by manually terminating the continuously running MQTT listener and does not indicate that the MQTT processing failed.
+
+---
+
+# Control and Actuator Prototype Status
+
+The control and actuator implementation has been successfully tested with:
+
+- MQTT sensor subscription
+- JSON sensor message decoding
+- Temperature control rules
+- Humidity control rules
+- Light control rules
+- JSON actuator command generation
+- MQTT actuator command publishing
+- MQTT actuator command subscription
+- Fan simulation
+- Dehumidifier simulation
+- Light simulation
+- End-to-end sensor-to-actuator testing
+
+The completed prototype demonstrates:
+
+```text
+Sensor Dataset
+      ↓
+Sensor Simulator
+      ↓
+MQTT
+      ↓
+Control Logic
+      ↓
+MQTT
+      ↓
+Actuator Simulator
+```
+
+This demonstrates a working IoT control pipeline where simulated sensor data can automatically generate and execute simulated actuator actions.
