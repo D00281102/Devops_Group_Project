@@ -16,6 +16,23 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
     print("Waiting for sensor readings...\n")
 
+def evaluate_sensor_data(sensor_data):
+    """
+    Evaluate sensor readings and generate control decisions.
+    """
+    decisions = []
+
+    if sensor_data["temp"] >= 25:
+        decisions.append("FAN ON - High temperature detected")
+
+    if sensor_data["humidity"] >= 70:
+        decisions.append("DEHUMIDIFIER ON - High humidity detected")
+
+    if sensor_data["light"]:
+        decisions.append("LIGHT DETECTED")
+
+    return decisions
+
 
 def on_message(client, userdata, message):
     """
@@ -26,10 +43,21 @@ def on_message(client, userdata, message):
 
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
-        print()
+        decisions = evaluate_sensor_data(sensor_data)
 
+        if decisions:
+            print("Control decisions:")
+
+            for decision in decisions:
+                print(f"- {decision}")
+        else:
+            print("Control decision: No action required")
+
+        print()
+        
     except json.JSONDecodeError:
-        print("Error: Received message is not valid JSON.")
+            print("Error: Received message is not valid JSON.")
+
 
 
 def start_control_logic():
