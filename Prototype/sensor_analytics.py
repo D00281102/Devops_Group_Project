@@ -6,13 +6,30 @@ temperatures = []
 humidities = []
 co_readings = []
 
+# Store readings separately for each sensor device
+device_data = {}
+
 with open(DATA_FILE, "r", newline="") as file:
     reader = csv.DictReader(file)
 
     for row in reader:
-        temperatures.append(float(row["temp"]))
-        humidities.append(float(row["humidity"]))
-        co_readings.append(float(row["co"]))
+        temperature = float(row["temp"])
+        humidity = float(row["humidity"])
+        co = float(row["co"])
+        device = row["device"]
+
+        temperatures.append(temperature)
+        humidities.append(humidity)
+        co_readings.append(co)
+
+        if device not in device_data:
+            device_data[device] = {
+                "temperatures": [],
+                "humidities": []
+            }
+
+        device_data[device]["temperatures"].append(temperature)
+        device_data[device]["humidities"].append(humidity)
 
 # Temperature analytics
 average_temp = sum(temperatures) / len(temperatures)
@@ -53,3 +70,21 @@ print(f"Number of readings: {len(co_readings)}")
 print(f"Average CO: {average_co:.6f}")
 print(f"Minimum CO: {minimum_co:.6f}")
 print(f"Maximum CO: {maximum_co:.6f}")
+
+print()
+
+print("Per-Device Analytics")
+print("--------------------")
+
+for device, readings in device_data.items():
+    device_temperatures = readings["temperatures"]
+    device_humidities = readings["humidities"]
+
+    average_device_temp = sum(device_temperatures) / len(device_temperatures)
+    average_device_humidity = sum(device_humidities) / len(device_humidities)
+
+    print(f"Device: {device}")
+    print(f"Readings: {len(device_temperatures)}")
+    print(f"Average temperature: {average_device_temp:.2f} °C")
+    print(f"Average humidity: {average_device_humidity:.2f} %")
+    print()
