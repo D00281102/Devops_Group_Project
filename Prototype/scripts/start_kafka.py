@@ -55,10 +55,23 @@ def start_kafka_connector():
             raise
 
 
+def start_kafka_consumer():
+    # Display messages from the Kafka sensor topic.
+    return subprocess.Popen([
+        rf"{KAFKA_HOME}\bin\windows\kafka-console-consumer.bat",
+        '--bootstrap-server', 'localhost:9092',
+        '--topic', 'sensor-telemetry',
+        '--from-beginning',
+        '--property',
+        'value.deserializer=org.apache.kafka.common.serialization.StringDeserializer'
+    ])
+
+
 def start_kafka():
     start_kafka_KafkaUI()
     create_kafka_topic()
     start_kafka_connector()
+    start_kafka_consumer()
 
 
 if __name__ == "__main__":
