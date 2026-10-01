@@ -298,15 +298,10 @@ Kafka broker, Kafka Connect, Mosquitto, the consumer, and the sensor are separat
 
 Kafka Connect needs an MQTT source connector plugin. The connector package includes the main connector JAR and its dependency JARs.
 
-Download the Confluent Platform file Here:
-[Confluent Platform](https://www.confluent.io/hub/confluentinc/kafka-connect-mqtt)
-
 The current local plugin layout is:
 
-```text
-C:\kafka\plugins\
-└── confluentinc-kafka-connect-mqtt-1.7.9\
-     ├── kafka-connect-mqtt-1.7.9.jar
+```te[Confluent Platform](https://www.confluent.io/hub/confluentinc/kafka-connect-mqtt)
+nnect-mqtt-1.7.9.jar
      ├── org.eclipse.paho.client.mqttv3-1.2.5.jar
      └── other connector dependency JARs
 ```
@@ -424,7 +419,7 @@ $body = @{
 
 Invoke-RestMethod `
      -Method Post `
-     -Uri "http://localhost:8083/connectors" `
+     -Uri "http://localhost:808ByteArrayConverter
      -ContentType "application/json" `
      -Body $body
 ```
