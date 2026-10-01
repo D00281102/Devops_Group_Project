@@ -1,6 +1,6 @@
 # Containerized Kafka Setup
 
-This guide runs Kafka and Kafka UI with Docker Compose. Mosquitto, Kafka Connect, the Kafka consumer, and the Python sensor currently run outside Docker.
+This guide runs Kafka, Kafka UI, and Kafka Connect with Docker Compose. Mosquitto and the Python sensor run outside Docker on Windows. The Kafka consumer is started by the Kafka automation script.
 
 For the complete manual Windows setup, see [local-setup.md](local-setup.md).
 
@@ -15,7 +15,7 @@ Mosquitto on Windows
     |
     | MQTT source connector
     v
-Kafka Connect on Windows
+Kafka Connect in Docker
     |
     | Kafka: localhost:9092
     v
@@ -58,20 +58,27 @@ Kafka Connect REST API: localhost:8083
 Kafka UI: http://localhost:8080
 ```
 
-Docker containers use the Kafka service name and internal listener:
+Docker containers use these internal addresses:
 
 ```text
 Kafka: kafka:9093
+
+MQTT from Kafka Connect: host.docker.internal:1883
 ```
 
 Kafka UI is configured to use `kafka:9093` in `docker-compose.yml`.
 
-## Start Kafka and Kafka UI
+## Start the Kafka Services Automatically
 
 From the project root:
 
+The startup script starts Kafka, Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and the Kafka consumer.
+
+Run it from the project root:
+
 ```powershell
-docker compose up -d kafka kafka-ui or docker compose up -d
+Set-Location "C:\Devops_Group_Project" (This is to set your directory)
+py .\Prototype\scripts\start_kafka.py
 ```
 
 Check the containers:
@@ -104,43 +111,12 @@ Open Kafka UI at:
 http://localhost:8080
 ```
 
-## Create the Kafka Topic
+The script waits for Kafka before creating `sensor-telemetry`. It also waits for Kafka Connect before registering the MQTT source connector.
 
-Use the Kafka tools from the existing local Kafka installation:
-
-```powershell
-Set-Location "C:\kafka"
-
-.\bin\windows\kafka-topics.bat `
-  --create `
-  --topic sensor-telemetry `
-  --bootstrap-server localhost:9092 `
-  --partitions 1 `
-  --replication-factor 1
-```
-
-If the topic already exists, continue to the next step.
-
-Verify it:
+Check the running services:
 
 ```powershell
-.\bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
-```
-
-## Start Kafka Connect
-
-Kafka Connect is not currently defined in `docker-compose.yml`, so start it separately:
-
-```powershell
-Set-Location "C:\kafka"
-.\bin\windows\connect-distributed.bat .\config\connect-distributed.properties
-```
-
-The Connect configuration must use:
-
-```properties
-bootstrap.servers=localhost:9092
-plugin.path=C:/kafka/plugins
+docker compose ps
 ```
 
 Check Kafka Connect:
@@ -159,34 +135,6 @@ The response should show:
 
 ```text
 io.confluent.connect.mqtt.MqttSourceConnector
-```
-
-## Register the MQTT Connector
-
-Run this in a separate PowerShell terminal:
-
-```powershell
-$body = @{
-    name = "mqtt-source"
-    config = @{
-        "connector.class" = "io.confluent.connect.mqtt.MqttSourceConnector"
-        "tasks.max" = "1"
-        "mqtt.server.uri" = "tcp://localhost:1883"
-        "mqtt.topics" = "sensors/telemetry"
-        "mqtt.qos" = "0"
-        "kafka.topic" = "sensor-telemetry"
-        "confluent.topic.bootstrap.servers" = "localhost:9092"
-        "confluent.topic.replication.factor" = "1"
-        "key.converter" = "org.apache.kafka.connect.storage.StringConverter"
-        "value.converter" = "org.apache.kafka.connect.converters.ByteArrayConverter"
-    }
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod `
-    -Method Post `
-    -Uri "http://localhost:8083/connectors" `
-    -ContentType "application/json" `
-    -Body $body
 ```
 
 Check the connector status:
@@ -213,18 +161,6 @@ In another terminal, subscribe to the sensor topic:
   -p 1883 `
   -t sensors/telemetry `
   -v
-```
-
-## Start the Kafka Consumer
-
-```powershell
-Set-Location "C:\kafka"
-
-.\bin\windows\kafka-console-consumer.bat `
-  --bootstrap-server localhost:9092 `
-  --topic sensor-telemetry `
-  --from-beginning `
-  --property value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 ```
 
 ## Start the Sensor
