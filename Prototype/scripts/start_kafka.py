@@ -6,6 +6,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from start_mqtt import start_mqtt
 
 KAFKA_HOME = r"C:\kafka"
 CONNECT_URL = "http://localhost:8083"
@@ -103,6 +104,7 @@ def start_kafka_consumer():
 
 
 def start_kafka():
+    start_mqtt()
     start_kafka_KafkaUI()
     wait_for_kafka()
     create_kafka_topic()
