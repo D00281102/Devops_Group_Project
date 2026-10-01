@@ -46,12 +46,11 @@ def analyse_sensor_data(rows):
         daily_data[date]["temperatures"].append(temperature)
         daily_data[date]["humidities"].append(humidity)
 
-
     # Temperature analytics
     print("Temperature Analytics")
     print("---------------------")
     print(f"Number of readings: {len(temperatures)}")
-    print(f"Average temperature: {sum(temperatures)/len(temperatures):.2f} °C")
+    print(f"Average temperature: {sum(temperatures) / len(temperatures):.2f} °C")
     print(f"Minimum temperature: {min(temperatures):.2f} °C")
     print(f"Maximum temperature: {max(temperatures):.2f} °C")
 
@@ -61,7 +60,7 @@ def analyse_sensor_data(rows):
     print("Humidity Analytics")
     print("------------------")
     print(f"Number of readings: {len(humidities)}")
-    print(f"Average humidity: {sum(humidities)/len(humidities):.2f} %")
+    print(f"Average humidity: {sum(humidities) / len(humidities):.2f} %")
     print(f"Minimum humidity: {min(humidities):.2f} %")
     print(f"Maximum humidity: {max(humidities):.2f} %")
 
@@ -71,13 +70,13 @@ def analyse_sensor_data(rows):
     print("CO Analytics")
     print("------------")
     print(f"Number of readings: {len(co_readings)}")
-    print(f"Average CO: {sum(co_readings)/len(co_readings):.6f}")
+    print(f"Average CO: {sum(co_readings) / len(co_readings):.6f}")
     print(f"Minimum CO: {min(co_readings):.6f}")
     print(f"Maximum CO: {max(co_readings):.6f}")
 
     print()
 
-    # Device analytics
+    # Per-device analytics
     print("Per-Device Analytics")
     print("--------------------")
 
@@ -88,10 +87,9 @@ def analyse_sensor_data(rows):
 
         print(f"Device: {device}")
         print(f"Readings: {len(temps)}")
-        print(f"Average temperature: {sum(temps)/len(temps):.2f} °C")
-        print(f"Average humidity: {sum(humidity_values)/len(humidity_values):.2f} %")
+        print(f"Average temperature: {sum(temps) / len(temps):.2f} °C")
+        print(f"Average humidity: {sum(humidity_values) / len(humidity_values):.2f} %")
         print()
-
 
     # Daily trends
     print("Daily Sensor Trends")
@@ -104,14 +102,16 @@ def analyse_sensor_data(rows):
 
         print(f"Date: {date}")
         print(f"Readings: {len(temps)}")
-        print(f"Average temperature: {sum(temps)/len(temps):.2f} °C")
-        print(f"Average humidity: {sum(humidity_values)/len(humidity_values):.2f} %")
+        print(f"Average temperature: {sum(temps) / len(temps):.2f} °C")
+        print(f"Average humidity: {sum(humidity_values) / len(humidity_values):.2f} %")
         print()
 
 
-# Current CSV input for testing
-with open(DATA_FILE, "r", newline="") as file:
+def analyse_csv_file():
+    with open(DATA_FILE, "r", newline="") as file:
+        reader = csv.DictReader(file)
+        analyse_sensor_data(reader)
 
-    reader = csv.DictReader(file)
 
-    analyse_sensor_data(reader)
+if __name__ == "__main__":
+    analyse_csv_file()
