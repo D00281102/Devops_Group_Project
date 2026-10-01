@@ -163,18 +163,6 @@ In another terminal, subscribe to the sensor topic:
   -v
 ```
 
-## Start the Kafka Consumer
-
-```powershell
-Set-Location "C:\kafka"
-
-.\bin\windows\kafka-console-consumer.bat `
-  --bootstrap-server localhost:9092 `
-  --topic sensor-telemetry `
-  --from-beginning `
-  --property value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
-```
-
 ## Start the Sensor
 
 ```powershell
