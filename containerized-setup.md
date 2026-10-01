@@ -32,8 +32,14 @@ Install and start:
 
 - Docker Desktop
 - Python 3
-- Eclipse Mosquitto
-- Apache Kafka tools and Kafka Connect
+- Eclipse Mosquitto installed at `C:\Program Files\mosquitto`
+- Apache Kafka tools installed at `C:\kafka`
+
+Mosquitto does not need to be started manually. The project startup script starts it automatically using the configuration file at:
+
+```text
+Prototype/mosquitto.conf
+```
 
 The dataset must be located at:
 
@@ -72,7 +78,7 @@ Kafka UI is configured to use `kafka:9093` in `docker-compose.yml`.
 
 From the project root:
 
-The startup script starts Kafka, Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and the Kafka consumer.
+The startup script automatically starts Mosquitto, Kafka, Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and the Kafka consumer. Mosquitto uses the project's `Prototype/mosquitto.conf` configuration so that Kafka Connect running in Docker can connect to the MQTT broker.
 
 Run it from the project root:
 
@@ -145,23 +151,20 @@ Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
 
 The connector and task should both report `RUNNING`.
 
-## Start Mosquitto and the MQTT Subscriber
+## MQTT Subscriber (Optional)
 
-Start Mosquitto in its own terminal:
+Mosquitto is started automatically by `start_kafka.py`, so it does not need to be started manually.
 
-```powershell
-& "C:\Program Files\mosquitto\mosquitto.exe" -v
-```
-
-In another terminal, subscribe to the sensor topic:
+To monitor the MQTT sensor messages in a separate terminal, run:
 
 ```powershell
 & "C:\Program Files\mosquitto\mosquitto_sub.exe" `
-  -h localhost `
-  -p 1883 `
-  -t sensors/telemetry `
-  -v
+ -h localhost `
+ -p 1883 `
+ -t sensors/telemetry `
+ -v
 ```
+
 
 ## Start the Sensor
 
