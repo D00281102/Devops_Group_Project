@@ -6,7 +6,7 @@ class TelemetryRow(BaseModel):
     One row of iot_telemetry_data, as returned by the API.
     Includes the auto-generated records column.
     """
-    records: Optional[int]
+    records: Optional[int] = None
     ts: float
     device: str
     co: float
