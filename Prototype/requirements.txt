@@ -6,3 +6,4 @@ uvicorn
 psycopg[binary]
 python-dotenv
 psycopg_pool
+requests
