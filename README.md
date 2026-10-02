@@ -1,251 +1,475 @@
-# Devops_Group_Project
+# IoT Telemetry API
 
-# IoT Telemetry — Database Access Guide
+HTTP API that exposes the `iot_telemetry_data` table in PostgreSQL so the
+front-end interface can read and modify telemetry records.
 
-This document contains everything you need to connect to the shared PostgreSQL
-database that holds the `iot_telemetry_data` dataset.
+Built with FastAPI, psycopg 3, and Pydantic.
 
----
+Each developer runs their own copy of the stack. The API and Postgres do
+not need to be on the same network as the rest of the team. See section
+9.4 if you're not on the same LAN as whoever is hosting the database.
 
-## 1. Connection Details
-
-| Item           | Value                                              |
-|----------------|----------------------------------------------------|
-| Host           | `192.168.1.8` (LAN IP — update if it changes)      |
-| Port           | `5434`                                             |
-| Database       | `postgres`                                         |
-| User           | `postgres`                                         |
-| Password       | *(ask the DB owner — not stored in this repo)*     |
-| Table          | `iot_telemetry_data`                               |
-| Rows           | 405,184                                            |
-| TimescaleDB    | Installed (v2.30.1), but table is a regular table  |
-
-**Connection string (for Python, JDBC, etc.):**
-
-> The port is **5434**, not the default 5432. Do not omit it.
+> Troubleshooting errors encountered during development are documented
+> separately in Jira under the API workstream. If something breaks, check
+> there first before pinging the team.
 
 ---
 
-## 2. Table Schema
+## 1. What this API does
 
-The table has 10 columns. The first column, `records`, is auto-generated.
+It sits between the PostgreSQL database and the front-end interface.
 
-| Column     | Type              | Notes                                    |
-|------------|-------------------|------------------------------------------|
-| `records`  | integer           | Auto-generated (1 … 405,184)             |
-| `ts`       | double precision  | Unix timestamp (seconds, with decimals)  |
-| `device`   | text              | MAC address of the sensor                |
-| `co`       | double precision  | Carbon monoxide reading                  |
-| `humidity` | double precision  | Humidity percentage                      |
-| `light`    | boolean           | true / false                             |
-| `lpg`      | double precision  | LPG reading                              |
-| `motion`   | boolean           | true / false                             |
-| `smoke`    | double precision  | Smoke reading                            |
-| `temp`     | double precision  | Temperature in Celsius                   |
+    Front-end  ->  API (this folder)  ->  PostgreSQL
+    (teammate)     (you, now)             (iot_telemetry_data table)
 
-> `records` is `GENERATED ALWAYS AS IDENTITY`. Do **not** insert a value into
-> it — PostgreSQL fills it automatically.
+The front-end calls HTTP endpoints. This API translates those calls into SQL
+and returns JSON.
 
-> `ts` is a Unix epoch timestamp, not a date type. Convert it in SQL with
-> `to_timestamp(ts)` if you need a readable date.
+Five endpoints:
+
+| Method | Path                    | Purpose                                |
+|--------|-------------------------|----------------------------------------|
+| GET    | /telemetry              | List rows (query: limit, offset)       |
+| GET    | /telemetry/{record_id}  | Fetch one row by records id            |
+| POST   | /telemetry              | Insert a new row                       |
+| PUT    | /telemetry/{record_id}  | Update specific fields on a row        |
+| DELETE | /telemetry/{record_id}  | Delete a row                           |
 
 ---
 
-## 3. For the Kafka Engineer
+## 2. Project layout
 
-You are producing/consuming messages that will be written to the
-`iot_telemetry_data` table (or read from it).
-
-- **Do not include the `records` column** in anything you send. PostgreSQL manages it.
-- Your JDBC sink connector will need:
-  - `connection.url` → `jdbc:postgresql://192.168.1.8:5434/postgres` - check connection details again if the URL is not working
-  - `connection.user` → `postgres`
-  - `connection.password` → *(get from DB owner)*
-- Kafka Connect JDBC sink does **not** support `GENERATED ALWAYS AS IDENTITY` in
-  `insert.mode=upsert` cleanly. Use `insert.mode=insert` if you are only adding
-  new rows, or drop the identity behaviour if you need upserts.
-- The table name for the connector is `iot_telemetry_data`.
-- The `light` and `motion` columns are **boolean**. Make sure your Kafka
-  schema treats them as such, or the insert will fail.
-
-- Test by sending one message and querying the table from psql:
-   SELECT * FROM iot_telemetry_data ORDER BY records DESC LIMIT 5;
+    Prototype/
+    ├── .env                    <- DB credentials (gitignored, NOT committed)
+    ├── .gitignore              <- ignores .env
+    ├── requirements.txt        <- Python dependencies
+    ├── Data_Sensor.py          <- MQTT publisher (separate workstream)
+    └── api/
+        ├── __init__.py
+        ├── config.py           <- reads .env, builds DATABASE_URL
+        ├── db.py               <- connection pool, get_connection()
+        ├── models.py           <- Pydantic schemas (shape of a row)
+        ├── routes.py           <- the five HTTP endpoints
+        ├── errors.py           <- JSON error handlers for DB failures
+        └── main.py             <- FastAPI app entry point
 
 ---
 
-## 4. For the Visualisation Engineer
+## 3. Setup — for teammates cloning the repo
 
-You only need **read access**.
+### 3.1 Install Python 3.12 or newer
 
-- Connect your tool (Confluent, Metabase, Grafana, Tableau, whatever) using the
-  connection string in section 1.
-- Example starting query:
-  ```sql
-  SELECT *
-  FROM iot_telemetry_data
-  ORDER BY records
-  LIMIT 100;
+Python 3.11 will NOT work. The uvicorn version pulled in by the current
+requirements file imports `typing.NotRequired`, which only exists from
+Python 3.12 onward.
 
-------------------------------------------------------------------------
-5. NETWORK SETUP — CAMPUS WI-FI
-------------------------------------------------------------------------
+Install Python 3.13 (matches the machines we tested on):
 
-Everyone, including the DB host, must be on the same campus Wi-Fi
-network. There is no VPN involved.
+    winget install --id Python.Python.3.13
 
-========================================================================
-5A. WHAT THE DB OWNER DOES
+Close every PowerShell/VS Code window afterwards and open a new one. Then:
 
-STEP 1 — Find your current campus Wi-Fi IP
+    python --version      # should print Python 3.13.x
 
-WHERE: PowerShell window (PS C:\WINDOWS\system32>)
+### 3.2 Clone the repo
 
-    ipconfig
+    git clone https://github.com/D00281102/Devops_Group_Project.git
 
-WHAT IT DOES: Lists every network adapter on your machine. Look for
-the adapter labelled "Wireless LAN adapter Wi-Fi" and find the line
-that says "IPv4 Address". It will look something like:
+Then switch to your branch:
 
-    IPv4 Address. . . . . . . . . . . : 10.20.30.45
+    git checkout Jo          # or Bright / Daniils / Simon — use your own
 
-Write that number down. This is the IP you will give to your teammates.
+Branch names are case-sensitive.
 
-STEP 2 — Update pg_hba.conf to allow the campus network
+### 3.3 Install the packages
 
-WHERE: Notepad, opened as Administrator
+From the repo root:
 
-File to edit:
-    C:\Program Files\PostgreSQL\17\data\pg_hba.conf
+    pip install -r Prototype/requirements.txt
 
-Find the line:
-    host all all 192.168.1.0/24 scram-sha-256
+Or manually:
 
-Replace it with the campus network range. If your IP is 10.20.30.45,
-the line becomes:
-    host all all 10.20.30.0/24 scram-sha-256
+    pip install fastapi uvicorn "psycopg[binary]" python-dotenv psycopg_pool
 
-WHAT IT DOES: Tells PostgreSQL which remote IP addresses are allowed
-to connect. Without this, anyone outside 192.168.1.x (i.e. everyone
-on campus) is rejected.
+### 3.4 Create your own `.env`
 
-STEP 3 — Confirm postgresql.conf is listening on all interfaces
+`.env` is gitignored on purpose — every machine has its own copy with its own
+DB values. Create `Prototype/.env` with:
 
-WHERE: Notepad, opened as Administrator
+    DB_HOST=localhost
+    DB_PORT=5434
+    DB_NAME=postgres
+    DB_USER=postgres
+    DB_PASSWORD=<your postgres password>
 
-File to edit:
-    C:\Program Files\PostgreSQL\17\data\postgresql.conf
+Notes:
+- `DB_HOST=localhost` if Postgres is on the same machine.
+- `DB_HOST=192.168.1.6` if Postgres is on the other laptop on the network.
+- `DB_NAME` must be the database that actually contains the
+  `iot_telemetry_data` table. On our setup that's `postgres`.
 
-Find the line:
+### 3.5 Check Postgres is reachable
+
+    psql -U postgres -h localhost -p 5434 -l
+
+Should list databases. If `psql` isn't on PATH:
+
+    & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5434 -l
+
+Verify the table exists:
+
+    psql -U postgres -h localhost -p 5434 -d postgres -c "\dt"
+
+You should see `iot_telemetry_data` in the list.
+
+If the table isn't there and you're on your own machine, see section 9.4
+Option A for how to create it and load the CSV.
+
+---
+
+## 4. Running the API
+
+From the `Prototype` folder:
+
+    python -m uvicorn api.main:app --reload
+
+You must be in `Prototype`, not the repo root — the import path
+`api.main:app` resolves relative to the current directory.
+
+You should see:
+
+    INFO:     Uvicorn running on http://127.0.0.1:8000
+    INFO:     Application startup complete.
+
+No traceback, no "pool" errors = good.
+
+### 4.1 Interactive API docs (free, auto-generated)
+
+Open in a browser:
+
+    http://127.0.0.1:8000/docs      <- Swagger UI (test requests here)
+    http://127.0.0.1:8000/redoc     <- ReDoc (nice to read)
+
+Use Swagger for testing. Click any endpoint, click **Try it out**, paste a
+body, click **Execute**. It handles JSON formatting for you — do NOT try to
+run the bash-style curl command that Swagger shows at the bottom.
+
+---
+
+## 5. Testing the endpoints
+
+### Health check
+
+    curl.exe http://127.0.0.1:8000/
+
+Should return `{"status":"ok"}`.
+
+### List rows
+
+    curl.exe "http://127.0.0.1:8000/telemetry?limit=3"
+
+Returns an array of row objects.
+
+### Fetch one row
+
+    curl.exe "http://127.0.0.1:8000/telemetry/1"
+
+Returns a single object.
+
+### POST / PUT / DELETE
+
+Use the Swagger page at `/docs` — PowerShell mangles the quotes in a curl
+JSON body. Or use `curl.exe` with a JSON file:
+
+    curl.exe -X POST "http://127.0.0.1:8000/telemetry" ^
+      -H "Content-Type: application/json" ^
+      --data-binary "@body.json"
+
+where `body.json` contains the JSON payload.
+
+---
+
+## 6. Configuration reference
+
+Read from `Prototype/.env` by `api/config.py`:
+
+| Variable    | Default     | Meaning                                       |
+|-------------|-------------|-----------------------------------------------|
+| DB_HOST     | localhost   | Postgres hostname or IP                       |
+| DB_PORT     | 5434        | Postgres port                                 |
+| DB_NAME     | postgres    | Database containing iot_telemetry_data        |
+| DB_USER     | postgres    | Postgres user                                 |
+| DB_PASSWORD | ""          | Postgres password (required)                  |
+
+These are combined into a `DATABASE_URL` of the form:
+
+    postgresql://USER:PASSWORD@HOST:PORT/DB_NAME
+
+which the connection pool in `api/db.py` uses.
+
+---
+
+## 7. Error responses
+
+All errors return JSON in the shape:
+
+    {"detail": "...", "error": "..."}   (for DB errors)
+    {"detail": "..."}                    (for validation / not-found)
+
+| Status | When it happens                                     |
+|--------|-----------------------------------------------------|
+| 400    | PUT with an empty body (no fields to update)        |
+| 404    | record_id doesn't exist in the table                |
+| 409    | DB constraint violated (e.g. NOT NULL, wrong type)  |
+| 422    | Request body failed validation (FastAPI auto)       |
+| 503    | Database unreachable (pool couldn't connect)        |
+
+The 422 responses come from FastAPI/Pydantic automatically — you don't need
+to raise them yourself. The 503 and 409 come from `api/errors.py`.
+
+---
+
+## 8. Architecture notes — why it's built this way
+
+### Connection pool, not one connection per request
+`api/db.py` creates a single `ConnectionPool` at import time. Every request
+borrows a connection and returns it when done. This avoids the cost of
+opening a fresh TCP+auth connection for every request. Standard pattern for
+web servers.
+
+### Three separate Pydantic models
+- `TelemetryRow` — what the API returns (includes `records`).
+- `TelemetryCreate` — what the client sends for POST (no `records`; the DB
+  generates it).
+- `TelemetryUpdate` — all fields optional, defaults to `None`. Used with
+  `model_dump(exclude_unset=True)` so PUT only updates the fields the client
+  actually sent. Sending `{"temp": 25}` leaves everything else alone.
+
+### `conn.commit()` is required
+psycopg does not auto-commit. Any INSERT/UPDATE/DELETE must call
+`conn.commit()` inside the connection block, or the change rolls back when
+the connection returns to the pool.
+
+### Parameterised SQL only
+Every query uses `%s` placeholders and passes values as a tuple. The one
+exception is the PUT route, which builds `SET col = %s, ...` from the keys
+of a Pydantic model — those keys come from our code, not user input, so
+they're safe. The values are still parameterised.
+
+---
+
+## 9. Network setup — if Postgres is on another machine
+
+This section only applies if you're trying to reach the team's Postgres
+over a network. If you're running your own Postgres locally, go straight to
+section 9.4 Option A and ignore 9.1–9.3.
+
+If the API runs on machine A and Postgres runs on machine B, three things
+must be true on machine B (the Postgres machine):
+
+### 9.1 `postgresql.conf` — allow external connections
+`C:\Program Files\PostgreSQL\17\data\postgresql.conf`
+
+Set:
+
     listen_addresses = '*'
 
-If it is not already set to '*', change it to that.
+(Remove the `#` at the start of the line.)
 
-WHAT IT DOES: Makes PostgreSQL accept connections on every network
-interface, not just localhost.
+To check it's already listening externally:
 
-STEP 4 — Open the Windows Firewall for port 5434
+    Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -eq 5434}
 
-WHERE: Windows Defender Firewall with Advanced Security
+If LocalAddress shows `0.0.0.0`, it's already accepting external connections.
 
-  1. Windows key -> type "Windows Defender Firewall with Advanced
-     Security" -> Enter
-  2. Click "Inbound Rules" on the left
-  3. Click "New Rule..." on the right
-  4. Select "Port" -> Next
-  5. Select "TCP", enter "5434" in "Specific local ports" -> Next
-  6. Select "Allow the connection" -> Next
-  7. Tick Domain, Private, Public -> Next
-  8. Name it "PostgreSQL 5434" -> Finish
+### 9.2 `pg_hba.conf` — allow your network range
+`C:\Program Files\PostgreSQL\17\data\pg_hba.conf`
 
-WHAT IT DOES: Lets other machines on the campus Wi-Fi reach your
-PostgreSQL port. Without this, the connection times out even if
-PostgreSQL is running.
+Add as the **last line** of the file:
 
-STEP 5 — Restart PostgreSQL
+    host    all    all    192.168.1.0/24    scram-sha-256
 
-WHERE: Windows Services
+Change `192.168.1.0/24` to match your network. Rules are matched top-down,
+first match wins, so this line catches everything the localhost rules don't.
 
-  1. Windows key -> type "Services" -> Enter
-  2. Find "postgresql-x64-17"
-  3. Right-click -> Restart
+Edit with Notepad run as Administrator (right-click Notepad → Run as admin).
 
-WHAT IT DOES: Reloads the config files you just edited. Changes to
-pg_hba.conf and postgresql.conf do not apply until the service
-restarts.
+### 9.3 Windows Firewall — open the port
+In an Administrator PowerShell on the Postgres machine:
 
-STEP 6 — Send your teammates the connection details
+    New-NetFirewallRule -DisplayName "Postgres 5434" -Direction Inbound -Protocol TCP -LocalPort 5434 -Action Allow
 
-    Host:     <your campus IPv4 address>  (e.g. 10.20.30.45)
-    Port:     5434
-    Database: postgres
-    User:     postgres
-    Password: (your password — send securely, not on a public channel)
-    Table:    iot_telemetry_data
+Restart Postgres afterwards:
 
-========================================================================
-5B. WHAT THE TEAMMATES DO
+    Restart-Service postgresql-x64-17
 
+Then on machine A, set `DB_HOST=<B's IP>` in `.env`.
 
-STEP 1 — Connect to the same campus Wi-Fi as the DB host
+### 9.4 If you are NOT on the same network as the Postgres machine
 
-WHAT IT DOES: The database is only reachable from inside the campus
-network. If you are on mobile data or a different Wi-Fi, the
-connection will fail.
+Everything in 9.1–9.3 only works when both machines are on the same LAN
+(same Wi-Fi, same home network). If your machine is somewhere else —
+different house, college network, mobile hotspot — the connection will time
+out no matter how Postgres is configured.
 
-STEP 2 — Test the network path
+**Before you read any further**: Option A below sets up a completely fresh,
+independent stack on your own machine. If you take that route, everything
+you already did in sections 3.1–3.3 still applies (Python, clone, packages).
+Section 3.4 onwards changes, because you'll be pointing at your own
+database, not the team's. Work through section 9.4 Option A and then come
+back to section 4 to run the API.
 
-WHERE: PowerShell window (PS C:\WINDOWS\system32>)
+You have three options. Pick the one that fits.
 
-    ping <DB_HOST_IP>
+**Option A — Load the CSV into your own local Postgres (recommended)**
 
-Replace <DB_HOST_IP> with the IP the DB owner gave you. Example:
+This is the cleanest option. You don't need anyone else's machine.
 
-    ping 10.20.30.45
+1. Install Postgres on your own machine (port 5434 to match the team setup,
+   or whatever you want — you control it).
 
-WHAT IT DOES: Sends a small packet to the DB host to confirm you can
-reach it at all.
+2. Get the CSV file. It's `iot_telemetry_data.csv` and should be in the
+   repo, under `Prototype/data/`. If it's not there, ask the team.
 
-  - Replies received -> good, move on.
-  - "Request timed out" -> you are on the wrong Wi-Fi, or the DB
-    owner's firewall is still blocking. Tell the DB owner.
+3. Create the table. In psql:
 
-STEP 3 — Test the database connection
+       psql -U postgres -h localhost -p 5434 -d postgres
 
-WHERE: PowerShell window (PS C:\WINDOWS\system32>)
+   Then paste:
 
-    psql -h <DB_HOST_IP> -p 5434 -U postgres
+       CREATE TABLE iot_telemetry_data (
+           records  SERIAL PRIMARY KEY,
+           ts       DOUBLE PRECISION NOT NULL,
+           device   TEXT NOT NULL,
+           co       DOUBLE PRECISION NOT NULL,
+           humidity DOUBLE PRECISION NOT NULL,
+           light    BOOLEAN NOT NULL,
+           lpg      DOUBLE PRECISION NOT NULL,
+           motion   BOOLEAN NOT NULL,
+           smoke    DOUBLE PRECISION NOT NULL,
+           temp     DOUBLE PRECISION NOT NULL
+       );
 
-Enter the password the DB owner gave you when prompted. You should
-land at postgres=#.
+   (If a teammate already has this table, run `\d iot_telemetry_data` on
+   their machine to get the exact column types and match them. Mismatched
+   types cause confusing errors later.)
 
-WHAT IT DOES: Attempts a real connection to PostgreSQL using the
-credentials the DB owner provided.
+4. Load the CSV. Easiest way is pgAdmin:
 
-  - If you get postgres=# -> you are connected.
-  - "Connection refused" -> PostgreSQL is not running or not
-    listening on 5434.
-  - "Connection timed out" -> firewall still blocking.
-  - "password authentication failed" -> wrong password.
+   - Open pgAdmin, connect to your local server.
+   - Right-click `iot_telemetry_data` → **Import/Export Data**.
+   - Mode: Import. Filename: point at the CSV. Format: csv. Header: Yes.
+   - Columns: match the CSV's column order to the table's columns.
+   - Click OK.
 
-STEP 4 — Verify you can see the data
+   Or from psql (faster if you're comfortable):
 
-WHERE: postgres=# prompt
+       \copy iot_telemetry_data (ts, device, co, humidity, light, lpg, motion, smoke, temp) FROM 'C:/path/to/iot_telemetry_data.csv' WITH (FORMAT csv, HEADER true);
 
-    SELECT COUNT(*) FROM iot_telemetry_data;
+   Note: `\copy` needs forward slashes even on Windows.
 
-WHAT IT DOES: Confirms the table exists and is populated. Should
-return 405184.
+5. Set your `.env`:
 
-STEP 5 — Exit
+       DB_HOST=localhost
+       DB_PORT=5434
+       DB_NAME=postgres
+       DB_USER=postgres
+       DB_PASSWORD=<your own password>
 
-WHERE: postgres=# prompt
+6. **Now go back to section 4** and start the API as normal. Everything from
+   section 4 onwards works exactly the same; it just talks to your own
+   database instead of the team's.
 
-    \q
+You now have a fully independent dev environment. Nothing depends on anyone
+else's machine.
 
-WHAT IT DOES: Closes the psql session.
+**Option B — Run Postgres in Docker on your own machine**
 
-NOTE: The DB host IP changes between networks (home vs campus). If
-your connection suddenly stops working, ask the DB owner for the new
-IP — do not assume the old one still works.
+If you have Docker, this skips the Postgres installer entirely:
 
+    docker run --name iot-postgres -e POSTGRES_PASSWORD=yourpassword -p 5434:5432 -d postgres:17
 
+Then load the CSV into it the same way as Option A steps 3–4. `.env` stays
+as `DB_HOST=localhost`, `DB_PORT=5434`. Once your container is up, go back
+to section 4 to run the API.
+
+Your repo already has a `docker-compose.yml` — check whether it already
+defines a Postgres service before starting a separate container.
+
+**Option C — Tunnel to the Postgres machine**
+
+Only worth doing if you specifically need to see the same data everyone
+else sees, live. Tools like Tailscale or ngrok create a private network
+between machines across the internet. This adds setup and security
+considerations and isn't needed for development. Avoid unless you have a
+specific reason.
+
+**What NOT to do**
+
+Do not try to expose Postgres directly to the public internet by
+port-forwarding on your router. Postgres has no business being reachable
+from the open internet, and you'll get scanned and attacked within hours.
+If you need remote access, use a tunnel (Option C), never a port forward.
+
+---
+
+## 10. What the front-end teammate needs to know
+
+- Base URL when running locally: `http://127.0.0.1:8000`
+- All responses are JSON.
+- Data shape: see `api/models.py`, or open `/docs` and look at the schemas.
+- Field names are exactly as in the table: `records`, `ts`, `device`, `co`,
+  `humidity`, `light`, `lpg`, `motion`, `smoke`, `temp`.
+- `light` and `motion` are booleans. Everything else numeric is a float
+  except `records` (integer) and `device` (string).
+- Pagination on the list endpoint: `?limit=100&offset=0`. Defaults are
+  100 and 0.
+- Errors: always check the HTTP status code. 4xx = your request, 5xx =
+  server/DB side. Body always has a `detail` field.
+- For testing the API without writing client code, use
+  `http://127.0.0.1:8000/docs`.
+
+---
+
+## 11. Git workflow
+
+- Work on your own branch (`Jo`, `Bright`, `Daniils`, `Simon`, ...).
+- Push to your branch: `git push origin <branch>`.
+- Do NOT push directly to `main` after this point.
+- To merge your work into `main`: open a Pull Request on GitHub, get it
+  reviewed, then merge.
+- Never commit `.env`. It's gitignored — if `git status` shows it, something
+  is wrong with `.gitignore`.
+
+---
+
+## 12. Quick reference
+
+Start the server:
+
+    cd Prototype
+    python -m uvicorn api.main:app --reload
+
+Test in browser:
+
+    http://127.0.0.1:8000/docs
+
+Test in terminal:
+
+    curl.exe "http://127.0.0.1:8000/telemetry?limit=3"
+
+Stop the server:
+
+    Ctrl+C in the terminal running uvicorn
+
+List databases:
+
+    psql -U postgres -h localhost -p 5434 -l
+
+List tables in `postgres`:
+
+    psql -U postgres -h localhost -p 5434 -d postgres -c "\dt"
+
+View all telemetry rows directly in SQL:
+
+    psql -U postgres -h localhost -p 5434 -d postgres -c "SELECT * FROM iot_telemetry_data LIMIT 10;"
