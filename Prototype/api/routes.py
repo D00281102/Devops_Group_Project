@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HttpException
+from fastapi import APIRouter, HTTPException
 from typing import List
 
 from api.models import TelemetryRow
@@ -9,7 +9,6 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
 # GET /telemetry
 @router.get("/", response_model=List[TelemetryRow])
-
 # function to list telemetry data with pagination
 def list_telemetry(limit: int = 100, offset: int = 0):
     with get_connection() as conn:
@@ -32,7 +31,6 @@ def list_telemetry(limit: int = 100, offset: int = 0):
     )for row in rows]
 
 @router.get("/{record_id}", response_model=TelemetryRow)
-# function to get a single telemetry data row by record_id
 def get_telemetry(record_id: int):
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -47,7 +45,7 @@ def get_telemetry(record_id: int):
             )
             row = cur.fetchone()
     if row is None:
-        raise HttpException(status_code=404, detail="Telemetry data not found")
+        raise HTTPException(status_code=404, detail="Telemetry data not found")
     return TelemetryRow(
         records=row[0], ts=row[1], device=row[2], co=row[3], humidity=row[4],
         light=row[5], lpg=row[6], motion=row[7], smoke=row[8], temp=row[9]
