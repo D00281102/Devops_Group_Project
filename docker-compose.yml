@@ -30,7 +30,7 @@ services:
   kafka-ui:
     image: kafbat/kafka-ui:main
     ports:
-      - 8080:8080
+      - "8080:8080"
     environment:
       DYNAMIC_CONFIG_ENABLED: "true"
       KAFKA_CLUSTERS_0_NAME: local
@@ -67,3 +67,20 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  sensor:
+      build:
+       context: .
+       dockerfile: dockerfile
+      depends_on:
+        - mosquitto
+      environment:
+        MQTT_BROKER: mosquitto
+      restart: "no"
