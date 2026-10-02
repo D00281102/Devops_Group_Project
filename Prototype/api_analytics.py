@@ -13,10 +13,14 @@ def get_sensor_data_from_api():
     return response.json()
 
 
-if __name__ == "__main__":
+def get_analytics_results():
     sensor_data = get_sensor_data_from_api()
 
     print(f"Retrieved {len(sensor_data)} sensor readings from API.")
     print()
 
-    analyse_sensor_data(sensor_data)
+    return analyse_sensor_data(sensor_data)
+
+
+if __name__ == "__main__":
+    results = get_analytics_results()
