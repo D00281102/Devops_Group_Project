@@ -1564,3 +1564,193 @@ Actuator Simulator
 ```
 
 This demonstrates a working IoT control pipeline where simulated sensor data can automatically generate and execute simulated actuator actions.
+
+---
+# Grafana Visualisation
+
+## Overview
+
+Grafana is used to visualise the IoT sensor data stored in the project PostgreSQL database.
+
+The current local data flow is:
+
+```text
+IoT Telemetry Dataset
+        ↓
+PostgreSQL Database
+        ↓
+Grafana PostgreSQL Datasource
+        ↓
+Grafana Dashboard
+        ↓
+Sensor Visualisation Panels
+
+The sensor data is stored in the iot_telemetry_data table in PostgreSQL.
+
+The table contains the following sensor fields:
+
+ts - Timestamp
+device - Device name
+co - Carbon monoxide reading
+humidity - Humidity reading
+light - Light status
+lpg - LPG reading
+motion - Motion status
+smoke - Smoke reading
+temp - Temperature reading
+
+The dataset contains approximately 405,000 sensor readings.
+
+Grafana Setup
+
+Grafana is running locally using Docker.
+
+The Grafana container is available on:
+
+http://localhost:3000
+
+The PostgreSQL database is running locally on port 5432.
+
+Grafana connects to PostgreSQL using the following settings:
+
+Host: host.docker.internal:5432
+Database: postgres
+User: postgres
+SSL Mode: disable
+
+The PostgreSQL password is not stored in this documentation.
+
+Grafana PostgreSQL Datasource
+
+A PostgreSQL datasource was added in Grafana to connect to the project database.
+
+The connection was tested successfully using Grafana's Save & Test option.
+
+The datasource was then used in Grafana Explore to confirm that real sensor data could be retrieved from the iot_telemetry_data table.
+
+Example query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    temp
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+Dashboard
+
+A Grafana dashboard called:
+
+IoT Sensor Data - Real Project
+
+was created using the project sensor data.
+
+The dashboard contains the following visualisation panels:
+
+Humidity Readings
+Temperature Readings
+CO Readings
+LPG Readings
+Smoke Readings
+Motion Readings
+Light Readings
+
+The dashboard was tested using the real data stored in PostgreSQL.
+
+Sensor Queries
+
+The panels use the ts field as the time value and the relevant sensor field for the reading.
+
+Example temperature query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    temp
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+Example humidity query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    humidity
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+Example CO query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    co
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+Example LPG query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    lpg
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+Example smoke query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    smoke
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+For the boolean sensor values, the same approach is used with the motion and light fields.
+
+Example motion query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    motion
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+
+Example light query:
+
+SELECT
+    to_timestamp(ts) AS "time",
+    light
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+Testing
+
+The Grafana datasource was tested successfully against the local PostgreSQL database.
+
+The dashboard was also tested with the project sensor dataset and confirmed to display real values for:
+
+Temperature
+Humidity
+CO
+LPG
+Smoke
+Motion
+Light
+
+The final dashboard was saved after removing duplicate panels.
+
+Reproducing the Grafana Setup
+
+To reproduce the Grafana setup on another machine:
+
+Install Docker Desktop.
+Make sure PostgreSQL is running.
+Set up the project PostgreSQL database and import the sensor dataset.
+Start Grafana using Docker.
+Open Grafana at http://localhost:3000.
+Add a PostgreSQL datasource using the local PostgreSQL connection details.
+Test the datasource connection.
+Create a dashboard using the iot_telemetry_data table.
+Add panels for the required sensor readings.
+Save the dashboard.
