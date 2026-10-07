@@ -73,12 +73,10 @@ def process_database_data(client):
 
 def on_connect(client, userdata, flags, reason_code, properties):
     """
-    Subscribe to the sensor telemetry topic after connecting to MQTT.
+    Confirm connection to MQTT for publishing actuator commands.
     """
     print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-    client.subscribe(SENSOR_TOPIC)
-    print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
-    print("Waiting for sensor readings...\n")
+    print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
 
 def evaluate_sensor_data(sensor_data):
     """
@@ -159,17 +157,23 @@ def on_message(client, userdata, message):
 
 def start_control_logic():
     """
-    Connect to MQTT and listen for incoming sensor readings.
+    Connect to MQTT and process the latest sensor reading
+    retrieved from the PostgreSQL database.
     """
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     client.on_connect = on_connect
-    client.on_message = on_message
-
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
     print("Starting IoT control logic...")
-    client.loop_forever()
+    print("Retrieving latest sensor reading from database...\n")
+
+    client.loop_start()
+
+    process_database_data(client)
+
+    client.loop_stop()
+    client.disconnect()
 
 
 if __name__ == "__main__":
