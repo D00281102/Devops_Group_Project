@@ -1,11 +1,75 @@
 import json
 import paho.mqtt.client as mqtt
+from api.db import get_connection
 
 # MQTT configuration
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 SENSOR_TOPIC = "sensors/telemetry"
 ACTUATOR_TOPIC = "actuators/commands"
+
+def get_latest_sensor_data():
+    """
+    Retrieve the latest sensor reading from the PostgreSQL database.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT records, ts, device, co, humidity, light,
+                       lpg, motion, smoke, temp
+                FROM iot_telemetry_data
+                ORDER BY records DESC
+                LIMIT 1
+                """
+            )
+
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "records": row[0],
+        "ts": row[1],
+        "device": row[2],
+        "co": row[3],
+        "humidity": row[4],
+        "light": row[5],
+        "lpg": row[6],
+        "motion": row[7],
+        "smoke": row[8],
+        "temp": row[9]
+    }
+
+def process_database_data(client):
+    """
+    Retrieve the latest sensor reading from the database,
+    evaluate it and publish any required actuator commands.
+    """
+    sensor_data = get_latest_sensor_data()
+
+    if sensor_data is None:
+        print("No sensor data found in database.")
+        return
+
+    print("Latest database sensor reading:")
+    print(json.dumps(sensor_data, indent=4))
+
+    commands = evaluate_sensor_data(sensor_data)
+
+    if commands:
+        print("Control decisions:")
+
+        for command in commands:
+            print(
+                f"- {command['actuator'].upper()} "
+                f"{command['action']} - {command['reason']}"
+            )
+
+            publish_actuator_command(client, command)
+    else:
+        print("Control decision: No action required")
 
 def on_connect(client, userdata, flags, reason_code, properties):
     """
