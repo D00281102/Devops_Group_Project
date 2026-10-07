@@ -1,6 +1,6 @@
 import json
 import paho.mqtt.client as mqtt
-from api.db import get_connection
+from api.db import get_connection, pool
 
 # MQTT configuration
 MQTT_BROKER = "localhost"
@@ -174,6 +174,7 @@ def start_control_logic():
 
     client.loop_stop()
     client.disconnect()
+    pool.close()
 
 
 if __name__ == "__main__":
