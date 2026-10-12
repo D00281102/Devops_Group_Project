@@ -1566,7 +1566,7 @@ Actuator Simulator
 This demonstrates a working IoT control pipeline where simulated sensor data can automatically generate and execute simulated actuator actions.
 
 ---
-# Grafana Visualisation
+## Grafana Visualisation
 
 ## Overview
 
@@ -1601,13 +1601,13 @@ temp - Temperature reading
 
 The dataset contains approximately 405,000 sensor readings.
 
-Grafana Setup
+## Grafana Setup
 
 Grafana is running locally using Docker.
 
 The Grafana container is available on:
 
-http://localhost:3000
+http://localhost:3001
 
 The PostgreSQL database is running locally on port 5432.
 
@@ -1656,101 +1656,137 @@ Light Readings
 
 The dashboard was tested using the real data stored in PostgreSQL.
 
-Sensor Queries
+## Sensor Queries
 
 The panels use the ts field as the time value and the relevant sensor field for the reading.
 
-Example temperature query:
+## Example temperature query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     temp
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
-Example humidity query:
+## Example humidity query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     humidity
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
-Example CO query:
+## Example CO query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     co
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
-Example LPG query:
+## Example LPG query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     lpg
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
-Example smoke query:
+## Example smoke query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     smoke
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
 For the boolean sensor values, the same approach is used with the motion and light fields.
 
-Example motion query:
+## Example motion query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     motion
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
+```
 
-Example light query:
+## Example light query:
 
+```sql
 SELECT
     to_timestamp(ts) AS "time",
     light
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
-Testing
+```
+
+## Testing
 
 The Grafana datasource was tested successfully against the local PostgreSQL database.
 
-The dashboard was also tested with the project sensor dataset and confirmed to display real values for:
+The dashboard contains the following visualisation panels:
 
-Temperature
-Humidity
-CO
-LPG
-Smoke
-Motion
-Light
+- Humidity Readings
+- Temperature Readings
+- CO Readings
+- LPG Readings
+- Smoke Readings
+- Current Motion Status
+- Current Light Status
+- Current Temperature
 
 The final dashboard was saved after removing duplicate panels.
 
-Reproducing the Grafana Setup
+## Reproducing the Grafana Setup
 
 To reproduce the Grafana setup on another machine:
 
-Install Docker Desktop.
-Make sure PostgreSQL is running.
-Set up the project PostgreSQL database and import the sensor dataset.
-Start Grafana using Docker.
-Open Grafana at http://localhost:3000.
-Add a PostgreSQL datasource using the local PostgreSQL connection details.
-Test the datasource connection.
-Create a dashboard using the iot_telemetry_data table.
-Add panels for the required sensor readings.
-Save the dashboard.
+- Install Docker Desktop and make sure it is running.
+
+- Make sure PostgreSQL is running locally and that the project database and sensor dataset have been imported.
+
+- In the project root directory, copy .env.example to .env.
+
+- Open .env and set GF_DATASOURCE_PASSWORD to the password for the local PostgreSQL user. Do not commit or share this file.
+
+- Open PowerShell in the project root directory.
+- Validate the Docker Compose configuration:
+
+  ```powershell
+  docker compose config --quiet
+  ```
+
+- Start Grafana:
+
+  ```powershell
+  docker compose up -d grafana
+  ```
+
+- Open Grafana at http://localhost:3001.
+
+- Check that the PostgreSQL datasource connects successfully and that the IoT Sensor Data - Real Project dashboard loads.
+
+- Confirm that the dashboard panels display sensor data.
+
+The datasource and dashboard are configured using the files in the grafana/provisioning and grafana/dashboards directories. Grafana uses the grafana-data Docker volume to preserve its data when the container is recreated.
+
+The .env file contains local credentials and must not be committed to Git.
