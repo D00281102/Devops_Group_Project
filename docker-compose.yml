@@ -67,3 +67,17 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
+    restart: unless-stopped
+
+volumes:
+  grafana-data:
