@@ -78,27 +78,34 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
     print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
 
-def evaluate_sensor_data(sensor_data):
+def evaluate_sensor_data(sensor_data, settings=None):
     """
-    Evaluate sensor readings and generate actuator commands.
+    Evaluate sensor readings using configurable control settings.
     """
+    if settings is None:
+        settings = {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
+
     commands = []
 
-    if sensor_data["temp"] >= 25:
+    if sensor_data["temp"] >= settings["temperature_threshold"]:
         commands.append({
             "actuator": "fan",
             "action": "ON",
             "reason": "High temperature detected"
         })
 
-    if sensor_data["humidity"] >= 70:
+    if sensor_data["humidity"] >= settings["humidity_threshold"]:
         commands.append({
             "actuator": "dehumidifier",
             "action": "ON",
             "reason": "High humidity detected"
         })
 
-    if sensor_data["light"]:
+    if settings["light_enabled"] and sensor_data["light"]:
         commands.append({
             "actuator": "light",
             "action": "ON",
