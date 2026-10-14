@@ -1,0 +1,16 @@
+# Use a lightweight Python image
+FROM python:3.12-slim
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy and install Python dependencies
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application files
+COPY . .
+
+# Start the Control Logic service
+CMD ["python", "Control_Logic.py"]

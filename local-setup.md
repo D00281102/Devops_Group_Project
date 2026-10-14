@@ -1790,3 +1790,140 @@ To reproduce the Grafana setup on another machine:
 The datasource and dashboard are configured using the files in the grafana/provisioning and grafana/dashboards directories. Grafana uses the grafana-data Docker volume to preserve its data when the container is recreated.
 
 The .env file contains local credentials and must not be committed to Git.
+
+---
+
+## Control Logic Docker Container Setup
+### Overview
+
+The IoT Control Logic service has been containerized using Docker.
+
+The container runs Control_Logic.py, which connects to the
+MQTT broker, retrieves sensor data from PostgreSQL and
+evaluates whether actuator commands are required.
+
+### Prerequisites
+
+Before running the Control Logic container, ensure:
+
+- Docker Desktop is installed and running.
+- PostgreSQL is running locally on port 5434.
+- The IoT telemetry database has been set up.
+- Mosquitto MQTT broker is running on port 1883.
+- Prototype/.env contains the required database credentials.
+
+### Docker Configuration
+
+The Dockerfile is located at:
+
+Prototype/Dockerfile.control
+
+The Control Logic service is configured in the root
+docker-compose.yml file.
+
+The container uses host.docker.internal to communicate
+with PostgreSQL and MQTT running on the host machine.
+
+### Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| MQTT_BROKER | MQTT broker hostname |
+| MQTT_PORT | MQTT broker port |
+| DB_HOST | PostgreSQL hostname |
+| DB_PORT | PostgreSQL port |
+| DB_NAME | Database name |
+| DB_USER | Database username |
+| DB_PASSWORD | Database password |
+
+The database password is loaded from Prototype/.env.
+This file must not be committed to Git.
+
+
+### Building and Running the Control Logic Container
+
+Open PowerShell in the project root directory.
+
+Make sure Docker Desktop, PostgreSQL and the Mosquitto MQTT broker are running.
+
+**1. Validate the Docker Compose configuration:**
+
+```powershell
+docker compose --env-file ./Prototype/.env config --quiet
+```
+
+**2. Build the Control Logic Docker image:**
+
+```powershell
+docker compose --env-file ./Prototype/.env build control-logic
+```
+
+**3. Run the Control Logic container:**
+
+```powershell
+docker compose --env-file ./Prototype/.env run --rm --no-deps control-logic
+```
+
+The container connects to the MQTT broker and PostgreSQL database.
+
+It retrieves the latest sensor reading, evaluates the control rules and publishes actuator commands when required.
+
+The current startup process checks the latest database reading and then exits. It does not continuously listen for incoming MQTT sensor readings.
+
+### Running the Actuator Simulator
+
+Open a separate PowerShell terminal and run:
+
+```powershell
+python .\Prototype\Actuator_Simulator.py
+```
+
+The Actuator Simulator subscribes to the `actuators/commands` MQTT topic and waits for commands.
+
+
+### Testing and Verification
+
+The Control Logic container was tested successfully using Docker Compose.
+
+The following tests were completed:
+
+- Docker image built successfully.
+- Container connected to the MQTT broker on port 1883.
+- Container connected to PostgreSQL on port 5434.
+- Latest sensor reading retrieved successfully from PostgreSQL.
+- Control rules evaluated successfully.
+- Actuator Simulator received MQTT commands.
+
+**Control Logic Integration Test**
+
+A simulated temperature reading of 30°C was passed to the Control Logic functions running inside Docker.
+
+The Control Logic correctly detected the high temperature and published a fan ON command to the `actuators/commands` MQTT topic.
+
+The Actuator Simulator received the command and displayed:
+
+```text
+Actuator command received:
+Actuator: fan
+Action: ON
+Reason: High temperature detected
+Simulated Fan: ON
+```
+
+This confirmed successful communication between the Dockerized Control Logic, MQTT broker and Actuator Simulator.
+
+The simulated reading was used for testing without modifying the PostgreSQL database.
+
+### Troubleshooting
+
+- **Docker not responding:** Check that Docker Desktop is running and its engine has started.
+- **MQTT connection failed:** Check that Mosquitto is running on port 1883.
+- **PostgreSQL connection failed:** Check port 5434 and the database credentials in `Prototype/.env`.
+- **Code changes not appearing:** Rebuild the Control Logic Docker image.
+- **Grafana password warning:** Configure `GF_DATASOURCE_PASSWORD` if required for the Grafana setup.
+
+### Current Limitations
+
+The current Control Logic startup retrieves and evaluates the latest PostgreSQL sensor reading, then exits.
+
+Continuous MQTT sensor subscriptions are not enabled in the current startup function. This requires further integration work.
