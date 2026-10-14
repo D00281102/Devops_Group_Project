@@ -1,9 +1,10 @@
 import json
 import paho.mqtt.client as mqtt
+import os
 
 # MQTT configuration
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 ACTUATOR_TOPIC = "actuators/commands"
 
 
