@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 import time
 import paho.mqtt.client as mqtt
+import os
 
 # MQTT configuration
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = "sensors/telemetry"
 
 # Path to the IoT telemetry dataset

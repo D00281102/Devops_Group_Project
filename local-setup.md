@@ -1927,3 +1927,48 @@ The simulated reading was used for testing without modifying the PostgreSQL data
 The current Control Logic startup retrieves and evaluates the latest PostgreSQL sensor reading, then exits.
 
 Continuous MQTT sensor subscriptions are not enabled in the current startup function. This requires further integration work.
+
+## Sensor and Actuator Simulator Docker Setup
+
+The Sensor Simulator and Actuator Simulator have been containerized using Docker.
+
+Both services connect to the local Mosquitto MQTT broker using `host.docker.internal:1883`.
+
+### Prerequisites
+
+- Docker Desktop running
+- Mosquitto MQTT broker running on port 1883
+- `Prototype/.env` configured
+
+### Build the containers
+
+```powershell
+docker compose --env-file ./Prototype/.env build sensor-simulator actuator-simulator
+```
+
+### Run the Sensor Simulator
+
+```powershell
+docker compose --env-file ./Prototype/.env run --rm --no-deps sensor-simulator
+```
+
+The Sensor Simulator reads the IoT telemetry CSV dataset and publishes 10 JSON readings to the `sensors/telemetry` MQTT topic.
+
+### Run the Actuator Simulator
+
+```powershell
+docker compose --env-file ./Prototype/.env run --rm --no-deps actuator-simulator
+```
+
+The Actuator Simulator subscribes to `actuators/commands` and continuously listens for commands from the Control Logic.
+
+### Testing
+
+Both containers were built and tested successfully.
+
+- Sensor Simulator connected to MQTT and published 10 readings.
+- Actuator Simulator connected to MQTT and subscribed to `actuators/commands`.
+- A test command was published to MQTT.
+- Actuator Simulator received the command and simulated switching the fan ON.
+
+The complete sensor-to-control-to-actuator pipeline still requires integration testing.
