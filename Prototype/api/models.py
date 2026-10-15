@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class TelemetryRow(BaseModel):
@@ -48,3 +48,19 @@ class TelemetryUpdate(BaseModel):
     smoke: Optional[float] = None
     temp: Optional[float] = None
 
+
+class ControlSettings(BaseModel):
+    """
+    Control settings saved in the control_settings database.
+    """
+    temperature_threshold: float = Field(
+        default=25.0,
+        ge=-50,
+        le=100
+    )
+    humidity_threshold: float = Field(
+        default=70.0,
+        ge=0,
+        le=100
+    )
+    light_enabled: bool = True
