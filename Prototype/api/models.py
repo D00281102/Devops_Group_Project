@@ -64,3 +64,4 @@ class ControlSettings(BaseModel):
         le=100
     )
     light_enabled: bool = True
+    updated_at: Optional[str] = None

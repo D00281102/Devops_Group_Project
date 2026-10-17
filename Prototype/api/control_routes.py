@@ -12,7 +12,7 @@ def get_control_settings():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT temperature_threshold, humidity_threshold, light_enabled
+                SELECT temperature_threshold, humidity_threshold, light_enabled, updated_at
                 FROM control_settings
                 WHERE id = 1
                 """
@@ -28,7 +28,7 @@ def get_control_settings():
                     )
                     VALUES (1, 25, 70, TRUE)
                     RETURNING temperature_threshold, humidity_threshold,
-                              light_enabled
+                              light_enabled, updated_at
                     """
                 )
                 row = cur.fetchone()
@@ -38,6 +38,7 @@ def get_control_settings():
         temperature_threshold=row[0],
         humidity_threshold=row[1],
         light_enabled=row[2],
+        updated_at=row[3].isoformat() if row[3] else None,
     )
 
 
@@ -59,7 +60,7 @@ def update_control_settings(payload: ControlSettings):
                     light_enabled = EXCLUDED.light_enabled,
                     updated_at = CURRENT_TIMESTAMP
                 RETURNING temperature_threshold, humidity_threshold,
-                          light_enabled
+                          light_enabled, updated_at
                 """,
                 (
                     payload.temperature_threshold,
@@ -74,4 +75,5 @@ def update_control_settings(payload: ControlSettings):
         temperature_threshold=row[0],
         humidity_threshold=row[1],
         light_enabled=row[2],
+        updated_at=row[3].isoformat() if row[3] else None,
     )
