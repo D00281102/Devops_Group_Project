@@ -4,169 +4,877 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Control Settings</title>
+    <title>IoT Control Centre</title>
+
     <style>
         * {
             box-sizing: border-box;
         }
 
-        body {
-            margin: 0;
-            padding: 30px 16px;
-            font-family: Arial, sans-serif;
-            background: #f1f5f9;
-            color: #1e293b;
+        :root {
+            --navy: #14213d;
+            --blue: #3867f5;
+            --background: #f4f6fb;
+            --text: #202b40;
+            --muted: #788399;
+            --border: #e5e9f2;
+            --green: #16865b;
         }
 
-        .container {
-            max-width: 560px;
-            margin: 40px auto;
-            padding: 28px;
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: var(--background);
+            color: var(--text);
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 245px;
+            flex-shrink: 0;
+            padding: 28px 18px;
+            background: var(--navy);
+            color: white;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 10px 32px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .brand-icon {
+            display: grid;
+            place-items: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: #3867f5;
+            font-size: 21px;
+        }
+
+        .nav-label {
+            margin: 12px 10px;
+            color: #98a6c1;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1.4px;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 13px 14px;
+            margin-bottom: 7px;
+            border-radius: 9px;
+            color: #d6deee;
+            font-size: 14px;
+        }
+
+        .nav-item.active {
+            background: #29406b;
+            color: white;
+        }
+
+        .sidebar-note {
+            margin-top: 40px;
+            padding: 15px;
+            border: 1px solid #344667;
+            border-radius: 12px;
+            color: #bdc9de;
+            font-size: 12px;
+            line-height: 1.7;
+        }
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            padding: 32px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .eyebrow {
+            margin: 0 0 8px;
+            color: var(--blue);
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1.5px;
         }
 
         h1 {
-            margin-top: 0;
-            font-size: 26px;
+            margin: 0;
+            font-size: 29px;
         }
 
-        .description {
-            color: #64748b;
-            line-height: 1.5;
+        .subtitle {
+            margin: 10px 0 0;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .connection {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 13px;
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            background: white;
+            color: var(--muted);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #a0a9b8;
+        }
+
+        .dot.online {
+            background: #18a66a;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+            align-items: start;
+            gap: 22px;
+        }
+
+        .right-column {
+            display: grid;
+            gap: 22px;
+        }
+
+        .card {
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(25, 40, 75, 0.035);
+        }
+
+        .card-heading {
+            display: flex;
+            align-items: flex-start;
+            gap: 13px;
+            margin-bottom: 23px;
+        }
+
+        .card-icon {
+            display: grid;
+            place-items: center;
+            width: 43px;
+            height: 43px;
+            flex-shrink: 0;
+            border-radius: 12px;
+            background: #edf1ff;
+            color: var(--blue);
+            font-size: 20px;
+        }
+
+        h2 {
+            margin: 2px 0 7px;
+            font-size: 18px;
+        }
+
+        .card-description {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
         }
 
         .field {
-            margin-top: 24px;
+            margin-top: 23px;
         }
 
-        label {
+        .field label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 9px;
+            font-size: 13px;
             font-weight: bold;
+        }
+
+        .input-wrap {
+            position: relative;
         }
 
         input[type="number"] {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
+            padding: 14px 55px 14px 14px;
+            border: 1px solid #dce2ed;
+            border-radius: 9px;
+            outline: none;
+            background: #fcfdff;
+            color: var(--text);
             font-size: 16px;
         }
 
-        .light-control {
+        input[type="number"]:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(56, 103, 245, 0.1);
+        }
+
+        .unit {
+            position: absolute;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .hint {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .light-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-top: 27px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            background: #fafbfe;
+        }
+
+        .light-title {
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .light-description {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 27px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            position: absolute;
+        }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            border-radius: 30px;
+            background: #c8cfdb;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .slider::before {
+            content: "";
+            position: absolute;
+            left: 3px;
+            top: 3px;
+            width: 21px;
+            height: 21px;
+            border-radius: 50%;
+            background: white;
+            transition: 0.2s;
+            box-shadow: 0 1px 4px #0002;
+        }
+
+        .switch input:checked + .slider {
+            background: var(--blue);
+        }
+
+        .switch input:checked + .slider::before {
+            transform: translateX(21px);
+        }
+
+        .switch input:focus-visible + .slider {
+            outline: 3px solid #a9bcff;
+            outline-offset: 3px;
+        }
+
+        .switch input:focus-visible:not(:focus) + .slider {
+            outline: none;
+        }
+
+        .save-button {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 9px;
+            width: 100%;
+            margin-top: 25px;
+            padding: 15px;
+            border: none;
+            border-radius: 9px;
+            background: var(--blue);
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .save-button:hover {
+            background: #244ed0;
+        }
+
+        .save-button:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .spinner {
+            display: none;
+            width: 15px;
+            height: 15px;
+            border: 2px solid #ffffff70;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .save-button.loading .spinner {
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #status {
+            margin: 15px 0 0;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .success {
+            color: var(--green);
+        }
+
+        .error {
+            color: #c0392b;
+        }
+
+        .setting-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
         }
 
-        .light-control label {
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .setting-value {
+            font-size: 17px;
+            font-weight: bold;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            background: #e4f7ed;
+            color: #16865b;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .pill.off {
+            background: #edf0f5;
+            color: #68758a;
+        }
+
+        .updated {
+            margin-top: 19px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .api-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .api-row:last-child {
+            border-bottom: none;
+        }
+
+        .api-label {
+            color: var(--muted);
+        }
+
+        .api-value {
+            font-weight: bold;
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .footer {
+            margin-top: 28px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .feedback-section {
+            margin-top: 30px;
+        }
+
+        .feedback-heading {
+            margin-bottom: 18px;
+        }
+
+        .feedback-heading h2 {
+            margin-bottom: 7px;
+            font-size: 21px;
+        }
+
+        .feedback-heading p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .feedback-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .feedback-card {
+            min-width: 0;
+            padding: 18px;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            background: white;
+            box-shadow: 0 5px 20px rgba(25, 40, 75, 0.035);
+        }
+
+        .feedback-card h3 {
+            margin: 0 0 13px;
+            font-size: 15px;
+        }
+
+        .feedback-card.success-panel h3 {
+            color: #16865b;
+        }
+
+        .feedback-card.error-panel h3 {
+            color: #c0392b;
+        }
+
+        .feedback-card.validation-panel h3 {
+            color: #a66b00;
+        }
+
+        .feedback-example {
+            padding: 13px;
+            border-radius: 9px;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+
+        .success-panel .feedback-example {
+            border: 1px solid #b9e8cf;
+            background: #eaf8f0;
+            color: #176c46;
+        }
+
+        .error-panel .feedback-example {
+            border: 1px solid #f3c4c1;
+            background: #fff0ef;
+            color: #a52c25;
+        }
+
+        .validation-panel .feedback-example {
+            border: 1px solid #f0d99b;
+            background: #fff8e5;
+            color: #805b12;
+        }
+
+        .feedback-example strong {
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        .feedback-example p {
             margin: 0;
         }
 
-        input[type="checkbox"] {
-            width: 22px;
-            height: 22px;
-            cursor: pointer;
+        .feedback-icon {
+            margin-right: 5px;
         }
 
-        button {
-            width: 100%;
-            margin-top: 28px;
-            padding: 13px;
-            border: none;
-            border-radius: 8px;
-            background: #2563eb;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
+        .validation-rule {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0d99b;
         }
 
-        button:hover {
-            background: #1d4ed8;
+        @media (max-width: 1000px) {
+            .feedback-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
-        button:disabled {
-            opacity: 0.6;
-            cursor: wait;
+
+        @media (max-width: 1000px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .right-column {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
         }
 
-        #status {
-            margin-top: 18px;
-            line-height: 1.5;
-        }
+        @media (max-width: 700px) {
+            .layout {
+                display: block;
+            }
 
-        .success {
-            color: #15803d;
-        }
+            .sidebar {
+                width: 100%;
+                padding: 17px;
+            }
 
-        .error {
-            color: #b91c1c;
+            .brand {
+                padding: 0 5px 15px;
+            }
+
+            .nav-label,
+            .sidebar-note {
+                display: none;
+            }
+
+            .nav-item {
+                display: inline-block;
+                margin: 0 4px 0 0;
+                padding: 10px;
+            }
+
+            .main {
+                padding: 22px 15px;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+                margin-bottom: 24px;
+            }
+
+            h1 {
+                font-size: 25px;
+            }
+
+            .card {
+                padding: 19px;
+            }
+
+            .right-column {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
+
 <body>
-    <main class="container">
-        <h1>IoT Control Settings</h1>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-icon">⌘</div>
+            <span>IoT Control Centre</span>
+        </div>
 
-        <p class="description">
-            Configure the temperature and humidity thresholds
-            and control the light.
-        </p>
+        <p class="nav-label">WORKSPACE</p>
+        <div class="nav-item active">⚙ &nbsp; Control Settings</div>
+        <div class="nav-item">▦ &nbsp; System Overview</div>
 
-        <form id="settings-form">
-            <div class="field">
-                <label for="temperature">
-                    Temperature threshold (&deg;C)
-                </label>
-                <input
-                    type="number"
-                    id="temperature"
-                    name="temperature_threshold"
-                    value="25"
-                    min="-50"
-                    max="100"
-                    step="0.1"
-                    required
-                >
+        <div class="sidebar-note">
+            <strong>Control panel</strong><br>
+            Manage your environmental thresholds and light setting from one place.
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">DEVICE MANAGEMENT</p>
+                <h1>Control Settings</h1>
+                <p class="subtitle">
+                    Configure your environment and review the latest saved settings.
+                </p>
             </div>
 
-            <div class="field">
-                <label for="humidity">
-                    Humidity threshold (%)
-                </label>
-                <input
-                    type="number"
-                    id="humidity"
-                    name="humidity_threshold"
-                    value="70"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    required
-                >
+            <div class="connection">
+                <span class="dot" id="connection-dot"></span>
+                <span id="connection-text">Checking API...</span>
             </div>
+        </header>
 
-            <div class="field light-control">
-                <label for="light">Light enabled</label>
-                <input
-                    type="checkbox"
-                    id="light"
-                    name="light_enabled"
-                    checked
-                >
+        <div class="dashboard">
+            <section class="card">
+                <div class="card-heading">
+                    <div class="card-icon">⚙</div>
+                    <div>
+                        <h2>Configure Controls</h2>
+                        <p class="card-description">
+                            Set the thresholds used by the control system.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="settings-form">
+                    <div class="field">
+                        <label for="temperature">Temperature threshold</label>
+                        <div class="input-wrap">
+                            <input
+                                type="number"
+                                id="temperature"
+                                name="temperature_threshold"
+                                min="-50"
+                                max="100"
+                                step="0.1"
+                                required
+                            >
+                            <span class="unit">°C</span>
+                        </div>
+                        <p class="hint">
+                            When the temperature reaches this threshold, the control
+                            logic can activate the fan.
+                        </p>
+                    </div>
+
+                    <div class="field">
+                        <label for="humidity">Humidity threshold</label>
+                        <div class="input-wrap">
+                            <input
+                                type="number"
+                                id="humidity"
+                                name="humidity_threshold"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                required
+                            >
+                            <span class="unit">%</span>
+                        </div>
+                        <p class="hint">
+                            When humidity reaches this threshold, the control logic
+                            can activate the dehumidifier.
+                        </p>
+                    </div>
+
+                    <div class="light-box">
+                        <div>
+                            <div class="light-title">Light control</div>
+                            <div class="light-description" id="light-description">
+                                Light is enabled.
+                            </div>
+                        </div>
+
+                        <label class="switch" for="light">
+                            <input
+                                type="checkbox"
+                                id="light"
+                                name="light_enabled"
+                                aria-label="Enable or disable light"
+                            >
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="save-button" id="save-button">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span id="save-button-text">Save Settings</span>
+                    </button>
+
+                    <p id="status" role="status" aria-live="polite"></p>
+                </form>
+            </section>
+
+            <div class="right-column">
+                <section class="card">
+                    <div class="card-heading">
+                        <div class="card-icon">▤</div>
+                        <div>
+                            <h2>Current Settings</h2>
+                            <p class="card-description">
+                                Latest values returned by the API.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="setting-row">
+                        <div class="setting-label">Temperature</div>
+                        <div class="setting-value" id="current-temperature">—</div>
+                    </div>
+
+                    <div class="setting-row">
+                        <div class="setting-label">Humidity</div>
+                        <div class="setting-value" id="current-humidity">—</div>
+                    </div>
+
+                    <div class="setting-row">
+                        <div class="setting-label">Light</div>
+                        <div id="current-light" class="pill off">Unknown</div>
+                    </div>
+
+                    <div class="updated">
+                        <strong>Last updated</strong><br>
+                        <span id="updated-at">Waiting for API...</span>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-heading">
+                        <div class="card-icon">⇄</div>
+                        <div>
+                            <h2>API Information</h2>
+                            <p class="card-description">
+                                Connection details for the settings service.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="api-row">
+                        <span class="api-label">Service</span>
+                        <span class="api-value">FastAPI</span>
+                    </div>
+
+                    <div class="api-row">
+                        <span class="api-label">Method</span>
+                        <span class="api-value">GET / PUT</span>
+                    </div>
+
+                    <div class="api-row">
+                        <span class="api-label">Endpoint</span>
+                        <span class="api-value">/control-settings</span>
+                    </div>
+
+                    <div class="api-row">
+                        <span class="api-label">Storage</span>
+                        <span class="api-value">PostgreSQL</span>
+                    </div>
+
+                    <p class="hint">
+                        Settings are retrieved from and saved through the API.
+                        Open <a href="http://127.0.0.1:8000/docs" target="_blank"
+                        rel="noopener noreferrer">API documentation</a> to test endpoints.
+                    </p>
+                </section>
             </div>
+        </div>
+                    <section class="feedback-section">
+                <div class="feedback-heading">
+                    <h2>Feedback &amp; Validation States</h2>
+                    <p>
+                        Examples of how the interface communicates successful saves,
+                        failed requests, and invalid input.
+                    </p>
+                </div>
 
-            <button type="submit" id="save-button">
-                Save Settings
-            </button>
+                <div class="feedback-grid">
+                    <article class="feedback-card success-panel">
+                        <h3>Success Message</h3>
 
-            <p id="status" role="status" aria-live="polite"></p>
-        </form>
+                        <div class="feedback-example">
+                            <strong>
+                                <span class="feedback-icon">✓</span>
+                                Settings saved successfully!
+                            </strong>
+                            <p>The new settings have been saved to the database.</p>
+                        </div>
+                    </article>
+
+                    <article class="feedback-card error-panel">
+                        <h3>Error Message</h3>
+
+                        <div class="feedback-example">
+                            <strong>
+                                <span class="feedback-icon">✕</span>
+                                Failed to save settings
+                            </strong>
+                            <p>
+                                There was an error saving the settings.
+                                Please check the API connection and try again.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article class="feedback-card validation-panel">
+                        <h3>Validation Errors</h3>
+
+                        <div class="feedback-example">
+                            <strong>
+                                <span class="feedback-icon">!</span>
+                                Invalid humidity threshold
+                            </strong>
+                            <p>Humidity must be between 0% and 100%.</p>
+
+                            <div class="validation-rule">
+                                <strong>Temperature threshold</strong>
+                                <p>Allowed range: -50°C to 100°C.</p>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+        <footer class="footer">
+            IoT Control Centre · Control Settings Dashboard
+
+        </footer>
     </main>
+</div>
 
 <script>
     const form = document.getElementById("settings-form");
@@ -174,14 +882,60 @@
     const humidityInput = document.getElementById("humidity");
     const lightInput = document.getElementById("light");
     const saveButton = document.getElementById("save-button");
+    const saveButtonText = document.getElementById("save-button-text");
     const statusMessage = document.getElementById("status");
+
+    const currentTemperature = document.getElementById("current-temperature");
+    const currentHumidity = document.getElementById("current-humidity");
+    const currentLight = document.getElementById("current-light");
+    const updatedAt = document.getElementById("updated-at");
+    const lightDescription = document.getElementById("light-description");
+    const connectionDot = document.getElementById("connection-dot");
+    const connectionText = document.getElementById("connection-text");
 
     const API_URL = "http://127.0.0.1:8000/control-settings";
 
-    // Load the saved settings when the page opens.
+    function showStatus(message, type = "") {
+        statusMessage.textContent = message;
+        statusMessage.className = type;
+    }
+
+    function setConnection(online) {
+        connectionDot.classList.toggle("online", online);
+        connectionText.textContent = online ? "API Connected" : "API Disconnected";
+    }
+
+    function displaySettings(settings) {
+        temperatureInput.value = settings.temperature_threshold;
+        humidityInput.value = settings.humidity_threshold;
+        lightInput.checked = settings.light_enabled;
+
+        currentTemperature.textContent =
+            Number(settings.temperature_threshold) + " °C";
+        currentHumidity.textContent =
+            Number(settings.humidity_threshold) + "%";
+
+        currentLight.textContent = settings.light_enabled ? "ON" : "OFF";
+        currentLight.classList.toggle("off", !settings.light_enabled);
+
+        lightDescription.textContent = settings.light_enabled
+            ? "Light is enabled."
+            : "Light is disabled.";
+
+        if (settings.updated_at) {
+            const date = new Date(settings.updated_at);
+            updatedAt.textContent = Number.isNaN(date.getTime())
+                ? settings.updated_at
+                : date.toLocaleString();
+        } else {
+            updatedAt.textContent = "No timestamp available";
+        }
+    }
+
     async function loadSettings() {
-        statusMessage.textContent = "Loading saved settings...";
-        statusMessage.className = "";
+        showStatus("Loading saved settings...");
+        updatedAt.textContent = "Loading...";
+        setConnection(false);
 
         try {
             const response = await fetch(API_URL);
@@ -191,33 +945,65 @@
             }
 
             const settings = await response.json();
-
-            temperatureInput.value = settings.temperature_threshold;
-            humidityInput.value = settings.humidity_threshold;
-            lightInput.checked = settings.light_enabled;
-
-            statusMessage.textContent = "Saved settings loaded.";
-            statusMessage.className = "success";
+            displaySettings(settings);
+            setConnection(true);
+            showStatus("Saved settings loaded.", "success");
         } catch (error) {
-            statusMessage.textContent =
-                "Unable to load settings. Check that the API is running.";
-            statusMessage.className = "error";
+            setConnection(false);
+            updatedAt.textContent = "Unable to retrieve timestamp";
+            showStatus(
+                "Unable to load settings. Check that the API is running.",
+                "error"
+            );
         }
     }
 
-    // Send the updated settings to the API.
+    lightInput.addEventListener("change", function () {
+        lightDescription.textContent = lightInput.checked
+            ? "Light is enabled."
+            : "Light is disabled.";
+    });
+
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
 
+        if (!form.reportValidity()) {
+            return;
+        }
+
+        const temperature = Number(temperatureInput.value);
+        const humidity = Number(humidityInput.value);
+
+        if (
+            !Number.isFinite(temperature) ||
+            temperature < -50 ||
+            temperature > 100
+        ) {
+            showStatus("Temperature must be between -50 and 100 °C.", "error");
+            temperatureInput.focus();
+            return;
+        }
+
+        if (
+            !Number.isFinite(humidity) ||
+            humidity < 0 ||
+            humidity > 100
+        ) {
+            showStatus("Humidity must be between 0 and 100%.", "error");
+            humidityInput.focus();
+            return;
+        }
+
         const settings = {
-            temperature_threshold: Number(temperatureInput.value),
-            humidity_threshold: Number(humidityInput.value),
+            temperature_threshold: temperature,
+            humidity_threshold: humidity,
             light_enabled: lightInput.checked
         };
 
         saveButton.disabled = true;
-        statusMessage.textContent = "Saving settings...";
-        statusMessage.className = "";
+        saveButton.classList.add("loading");
+        saveButtonText.textContent = "Saving...";
+        showStatus("Saving settings...");
 
         try {
             const response = await fetch(API_URL, {
@@ -229,23 +1015,27 @@
             });
 
             if (!response.ok) {
+                if (response.status === 422) {
+                    throw new Error("The API rejected the values. Check the limits.");
+                }
                 throw new Error("Could not save settings.");
             }
 
             const savedSettings = await response.json();
-
-            temperatureInput.value = savedSettings.temperature_threshold;
-            humidityInput.value = savedSettings.humidity_threshold;
-            lightInput.checked = savedSettings.light_enabled;
-
-            statusMessage.textContent = "Settings saved successfully!";
-            statusMessage.className = "success";
+            displaySettings(savedSettings);
+            setConnection(true);
+            showStatus("Settings saved successfully!", "success");
         } catch (error) {
-            statusMessage.textContent =
-                "Unable to save settings. Check the API and try again.";
-            statusMessage.className = "error";
+            setConnection(false);
+            showStatus(
+                "Failed to save settings. The API may be unavailable. " +
+                "Please check the connection and try again.",
+                "error"
+            );
         } finally {
             saveButton.disabled = false;
+            saveButton.classList.remove("loading");
+            saveButtonText.textContent = "Save Settings";
         }
     });
 
