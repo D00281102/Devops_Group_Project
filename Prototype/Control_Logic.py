@@ -1,6 +1,7 @@
 import json
 import paho.mqtt.client as mqtt
 from api.db import get_connection, pool
+from api.control_db import get_control_connection
 import os
 
 # MQTT configuration
@@ -8,6 +9,34 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
 ACTUATOR_TOPIC = "actuators/commands"
+
+def get_control_settings():
+    """
+    Retrieve the saved control settings from PostgreSQL.
+    """
+    with get_control_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT temperature_threshold, humidity_threshold, light_enabled
+                FROM control_settings
+                WHERE id = 1
+                """
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        return {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
+
+    return {
+        "temperature_threshold": row[0],
+        "humidity_threshold": row[1],
+        "light_enabled": row[2]
+    }
 
 def get_latest_sensor_data():
     """
@@ -57,7 +86,8 @@ def process_database_data(client):
     print("Latest database sensor reading:")
     print(json.dumps(sensor_data, indent=4))
 
-    commands = evaluate_sensor_data(sensor_data)
+    settings = get_control_settings()
+    commands = evaluate_sensor_data(sensor_data, settings)
 
     if commands:
         print("Control decisions:")
@@ -140,7 +170,8 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-        commands = evaluate_sensor_data(sensor_data)
+        settings = get_control_settings()
+        commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
             print("Control decisions:")
