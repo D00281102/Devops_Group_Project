@@ -79,5 +79,37 @@ services:
       GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
     restart: unless-stopped
 
+  control-logic:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.control
+    image: iot-control-logic:latest
+    environment:
+      MQTT_BROKER: host.docker.internal
+      MQTT_PORT: "1883"
+      DB_HOST: host.docker.internal
+      DB_PORT: "5434"
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+
+  sensor-simulator:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.sensor
+    image: iot-sensor-simulator:latest
+    environment:
+      MQTT_BROKER: host.docker.internal
+      MQTT_PORT: "1883"
+
+  actuator-simulator:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.actuator
+    image: iot-actuator-simulator:latest
+    environment:
+      MQTT_BROKER: host.docker.internal
+      MQTT_PORT: "1883"
+
 volumes:
   grafana-data:

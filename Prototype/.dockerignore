@@ -1,0 +1,23 @@
+# Environment variables and credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Git and editor files
+.git/
+.vscode/
+
+# Local logs and temporary files
+*.log
+*.tmp
