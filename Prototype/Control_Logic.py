@@ -104,10 +104,16 @@ def process_database_data(client):
 
 def on_connect(client, userdata, flags, reason_code, properties):
     """
-    Confirm connection to MQTT for publishing actuator commands.
+    Connect to MQTT and subscribe to live sensor readings.
     """
-    print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+    if reason_code == 0:
+        print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+
+        client.subscribe(SENSOR_TOPIC)
+        print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
+    else:
+        print(f"MQTT connection failed: {reason_code}")
 
 def evaluate_sensor_data(sensor_data, settings=None):
     """
@@ -192,28 +198,39 @@ def on_message(client, userdata, message):
     except json.JSONDecodeError:
             print("Error: Received message is not valid JSON.")
 
-
-
 def start_control_logic():
     """
-    Connect to MQTT and process the latest sensor reading
-    retrieved from the PostgreSQL database.
+    Connect to MQTT, process the latest database reading,
+    and continuously listen for live sensor readings.
     """
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     client.on_connect = on_connect
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.on_message = on_message
 
     print("Starting IoT control logic...")
-    print("Retrieving latest sensor reading from database...\n")
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-    client.loop_start()
+    try:
+        client.loop_start()
 
-    process_database_data(client)
+        print("Retrieving latest sensor reading from database...\n")
+        process_database_data(client)
 
-    client.loop_stop()
-    client.disconnect()
-    pool.close()
+        print(f"Listening for live sensor readings on: {SENSOR_TOPIC}")
+
+        # Keep the control logic running to receive MQTT messages.
+        while True:
+            import time
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("Stopping IoT control logic...")
+
+    finally:
+        client.loop_stop()
+        client.disconnect()
+        pool.close()
 
 
 if __name__ == "__main__":

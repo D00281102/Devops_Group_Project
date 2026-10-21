@@ -1,8 +1,12 @@
-# Containerized Kafka Setup
+# Containerised IoT and Kafka Setup
 
-This guide runs Kafka, Kafka UI, and Kafka Connect with Docker Compose. Mosquitto and the Python sensor run outside Docker on Windows. The Kafka consumer is started by the Kafka automation script.
+This guide covers the project's Docker Compose setup, including Kafka, Kafka Connect, Kafka UI, Mosquitto MQTT, the Sensor Simulator, Control Logic, Actuator Simulator and Grafana.
 
-For the complete manual Windows setup, see [local-setup.md](local-setup.md).
+**Note:** The original Kafka setup instructions below describe the earlier Windows-based configuration, where Mosquitto and the Sensor Simulator ran outside Docker. These instructions are retained for reference and may not match the current Compose configuration.
+
+For the current containerised Sensor Simulator, Control Logic, Actuator Simulator and Mosquitto setup, see **Dockerised IoT Control System — SCRUM-102** further down this document.
+
+For the original manual Windows setup, see [local-setup.md](local-setup.md).
 
 ## Architecture
 
@@ -196,6 +200,161 @@ docker compose down
 
 Do not use `docker compose down -v` unless you intentionally want to remove Docker volumes and stored Kafka data.
 
-## Current Scope
+## Previous Setup Scope (Historical)
 
 The current Compose file containerizes Kafka and Kafka UI only. A fully containerized setup would also need Compose services for Mosquitto, Kafka Connect, the MQTT connector plugin, the sensor, and the Kafka consumer.
+
+## Dockerised IoT Control System — 21/10/26 updated
+
+### Overview
+
+The IoT control components have been containerised using Docker Compose. The system reads sensor data from a CSV file, publishes readings through MQTT, evaluates configurable control rules and sends commands to an actuator simulator.
+
+The relevant services are:
+
+- `mosquitto` — MQTT broker
+- `sensor-simulator` — publishes CSV sensor readings
+- `control-logic` — processes sensor readings and applies PostgreSQL control settings
+- `actuator-simulator` — receives and simulates actuator commands
+
+### MQTT Topics
+
+| Topic | Purpose |
+|---|---|
+| `sensors/telemetry` | Sensor readings published by the Sensor Simulator |
+| `actuators/commands` | Commands published by Control Logic |
+
+All three Python services connect to the Docker MQTT broker using `mosquitto:1883`.
+
+### Starting the Containers
+
+Open PowerShell in the project root directory.
+
+Ensure Docker Desktop is running and the required local PostgreSQL databases are accessible.
+
+Create a local `.env` file containing the required database password:
+
+```dotenv
+DB_PASSWORD=your_local_postgresql_password
+```
+
+Do not commit `.env` files or database passwords to Git.
+
+Build and start the four IoT services:
+
+```powershell
+docker compose up -d --build mosquitto control-logic actuator-simulator
+```
+
+Start or replay the Sensor Simulator:
+
+```powershell
+docker compose up -d --force-recreate sensor-simulator
+```
+
+Check container status:
+
+```powershell
+docker compose ps
+```
+
+### PostgreSQL Configuration
+
+Control Logic currently connects to PostgreSQL running on the host machine.
+
+The Docker Compose configuration uses:
+
+| Variable | Current value |
+|---|---|
+| `DB_HOST` | `host.docker.internal` |
+| `DB_PORT` | `5434` |
+| `DB_NAME` | `postgres` by default |
+| `CONTROL_DB_HOST` | `host.docker.internal` |
+| `CONTROL_DB_PORT` | `5434` |
+| `CONTROL_DB_NAME` | `control_settings_db` by default |
+
+The actual database names and credentials must match the local PostgreSQL setup.
+
+Control settings are retrieved from the `control_settings` table, including:
+
+- `temperature_threshold`
+- `humidity_threshold`
+- `light_enabled`
+
+The Control Logic uses these saved values to determine which actuator commands to publish.
+
+**Group integration note:** When Simon's PostgreSQL container is integrated, the database hostnames, ports and service dependencies will need to be updated and retested.
+
+### Testing the Sensor-to-Actuator Flow
+
+Check that the Sensor Simulator publishes CSV readings:
+
+```powershell
+docker compose logs --tail=50 sensor-simulator
+```
+
+Check that Control Logic receives sensor readings and publishes commands:
+
+```powershell
+docker compose logs --tail=100 control-logic
+```
+
+Check that the Actuator Simulator receives commands:
+
+```powershell
+docker compose logs --tail=50 actuator-simulator
+```
+
+The expected flow is:
+
+```text
+Data_Sensor.py
+    |
+    v
+Mosquitto MQTT (sensors/telemetry)
+    |
+    v
+Control_Logic.py
+    |
+    +-- PostgreSQL control settings
+    |
+    v
+Mosquitto MQTT (actuators/commands)
+    |
+    v
+Actuator_Simulator.py
+```
+
+### Testing Completed
+
+The following tests were completed during SCRUM-102:
+
+- All four IoT components started successfully using Docker Compose.
+- The Sensor Simulator published 10 readings from the IoT CSV dataset.
+- Control Logic received live MQTT sensor messages.
+- Control Logic successfully retrieved PostgreSQL settings.
+- Readings exceeding the configured humidity threshold generated Dehumidifier ON commands.
+- The Actuator Simulator received and simulated the commands.
+- A separate below-threshold test generated no actuator commands.
+
+### Group Handover Notes
+
+The IoT control components have been containerised and tested together.
+
+Before the full group deployment, the following integration points should be reviewed:
+
+1. Replace the current host-based PostgreSQL connections when the database container is available.
+2. Verify that Kafka Connect uses the Docker Mosquitto broker instead of the old Windows broker.
+3. Remove or replace the Windows-specific Kafka Connect plugin path for deployment on other machines.
+4. Confirm that all services start correctly using the group's final Docker Compose configuration.
+5. Retest the complete sensor, Kafka, database, control and actuator flow after the group components are integrated.
+
+### Stopping the Services
+
+Stop the IoT components without removing the rest of the group's running services:
+
+```powershell
+docker compose stop sensor-simulator control-logic actuator-simulator mosquitto
+```
+
+The MQTT broker currently allows anonymous connections for local development. Authentication and appropriate access controls should be added before production deployment.
