@@ -418,3 +418,129 @@ docker compose up -d --build control-api
 - If port 8000 is already in use, check for another service using that port.
 - If the API cannot connect to the database, check the `.env` settings and confirm that the database service or configured database host is reachable.
 - If the Compose configuration is invalid, run `docker compose config` to display the resolved configuration and look for errors.
+
+
+
+## ControlDB Containerization — SCRUM-104
+
+### Overview
+
+The Control Settings Database (ControlDB) stores user-configurable temperature, humidity and light settings.
+
+The Control API saves settings to ControlDB, and the Control Logic reads those settings to make actuator decisions.
+
+ControlDB is separate from the telemetry database used for sensor data.
+
+### Database Configuration
+
+- Docker service: `control-db`
+- Database: `control_settings_db`
+- Table: `control_settings`
+- PostgreSQL version: 17
+- Docker image: `ghcr.io/baosystems/postgis:17-3.5`
+- Windows connection: `localhost:5435`
+- Docker connection: `control-db:5432`
+- Persistent volume: `controldb-data`
+
+The PostGIS image is currently used because the official PostgreSQL image could not be downloaded during local testing.
+
+### Environment Setup
+
+Create a `.env` file in the project root using `.env.example` as a template.
+
+Set the following variable:
+
+```dotenv
+CONTROL_DB_PASSWORD=your_local_control_db_password
+```
+
+Do not commit `.env` or actual database passwords to GitHub.
+
+### Start ControlDB
+
+The persistent volume is currently configured as an external Docker volume.
+
+Create it before starting ControlDB for the first time:
+
+```powershell
+docker volume create controldb-data
+```
+
+Validate the Docker Compose configuration:
+
+```powershell
+docker compose config --quiet
+```
+
+Start ControlDB:
+
+```powershell
+docker compose up -d control-db
+```
+
+Check that the container is healthy:
+
+```powershell
+docker compose ps control-db
+```
+
+### Automatic Database Initialization
+
+The file `Prototype/control_settings_docker.sql` is mounted into `/docker-entrypoint-initdb.d/`.
+
+When PostgreSQL initializes an empty data directory, the script automatically creates the `control_settings` table and inserts the default settings:
+
+- Temperature threshold: 25
+- Humidity threshold: 70
+- Light enabled: true
+
+The script does not overwrite existing settings when rerun.
+
+### Verify the Database
+
+Run:
+
+```powershell
+docker compose exec control-db psql -U postgres -d control_settings_db -c "SELECT id, temperature_threshold, humidity_threshold, light_enabled FROM control_settings;"
+```
+
+This displays the saved settings.
+
+### Data Persistence
+
+ControlDB stores its PostgreSQL data in the named Docker volume `controldb-data`.
+
+The database was tested successfully after:
+
+- Restarting the container.
+- Recreating the container.
+- Updating the temperature threshold from 25 to 28.
+
+The updated setting remained saved after both tests.
+
+Do not use `docker compose down -v` or delete the `controldb-data` volume unless you intentionally want to remove stored database data.
+
+### Integration
+
+The Control API and Control Logic use these Docker network connection details:
+
+```dotenv
+CONTROL_DB_HOST=control-db
+CONTROL_DB_PORT=5432
+CONTROL_DB_NAME=control_settings_db
+CONTROL_DB_USER=postgres
+```
+
+The ControlDB password is supplied separately through `CONTROL_DB_PASSWORD`.
+
+The telemetry database remains separate and uses its own connection settings.
+
+Full end-to-end integration should be retested after all group services are running together.
+
+### Stop ControlDB
+
+```powershell
+docker compose stop control-db
+```
+
+This stops PostgreSQL without deleting its persistent volume.
