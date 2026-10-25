@@ -14,6 +14,61 @@ not need to be on the same network as the rest of the team. See section
 > there first before pinging the team.
 
 ---
+## Running the Project with Docker
+
+### Requirements
+
+- Docker Desktop installed and running.
+- The project repository cloned to your computer.
+- A local PostgreSQL server with the required databases and tables.
+- A root `.env` file with the database credentials.
+### Configure environment variables
+
+Create a `.env` file in the project root (the same folder as `docker-compose.yml`). Add your own database passwords:
+
+```dotenv
+DB_PASSWORD=your_postgres_password
+CONTROL_DB_PASSWORD=your_control_database_password
+GF_DATASOURCE_PASSWORD=your_grafana_database_password
+```
+
+Replace the example values with the correct credentials for your local setup. Do not commit this file to Git.
+
+The telemetry database must be reachable on the configured `DB_PORT`, and the control settings database must be reachable on `CONTROL_DB_PORT`. The defaults are `5434` and `5432`, respectively, for the API. Check `docker-compose.yml` for service-specific settings.
+
+### Start the project
+
+Open PowerShell in the project folder and run:
+
+```powershell
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps -a
+```
+
+The first command checks the configuration, the second builds and starts the services, and the third shows their status.
+
+### Useful URLs
+
+- Dashboard: `http://127.0.0.1:5500/Prototype/control_ui/index.html` (when VS Code Live Server is running).
+- API documentation: `http://localhost:8000/docs`
+- Kafka UI: `http://localhost:8081`
+- Grafana: `http://localhost:3001`
+
+### Stop the project
+
+Run this from the project folder:
+
+```powershell
+docker compose down
+```
+
+### Troubleshooting
+
+- If a port is already in use, check which application is using it before changing the port.
+- If a container exits, check its logs with `docker compose logs --tail=40 SERVICE_NAME`.
+- Keep database passwords in your local `.env` file. Never commit `.env` files to Git.
+
 
 ## 1. What this API does
 
