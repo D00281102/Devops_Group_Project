@@ -1740,7 +1740,7 @@ LIMIT 100;
 ```
 
 ## Testing
-
+The datasource and dashboard are configured using the files in `Prototype/grafana/provisioning` and `Prototype/grafana/dashboards`. Grafana uses the `grafana-data` Docker volume to preserve its data when the container is recreated.
 The Grafana datasource was tested successfully against the local PostgreSQL database.
 
 The dashboard contains the following visualisation panels:
@@ -1787,7 +1787,7 @@ To reproduce the Grafana setup on another machine:
 
 - Confirm that the dashboard panels display sensor data.
 
-The datasource and dashboard are configured using the files in the grafana/provisioning and grafana/dashboards directories. Grafana uses the grafana-data Docker volume to preserve its data when the container is recreated.
+The datasource and dashboard are configured using the files in Prototype/grafana/provisioning and Prototype/grafana/dashboards. Grafana uses the grafana-data Docker volume to preserve its data when the container is recreated.
 
 The .env file contains local credentials and must not be committed to Git.
 
