@@ -358,3 +358,44 @@ docker compose stop sensor-simulator control-logic actuator-simulator mosquitto
 ```
 
 The MQTT broker currently allows anonymous connections for local development. Authentication and appropriate access controls should be added before production deployment.
+
+## Control API Containerization — SCRUM-103
+
+The Control API has been added to the Docker Compose setup so it can run alongside the existing project services.
+
+### Build and start
+
+From the project root, run:
+
+```powershell
+docker compose config --quiet
+docker compose up -d --build control-api
+```
+
+Check the service status:
+
+```powershell
+docker compose ps -a
+```
+
+### API documentation
+
+When the API is running, open:
+
+`http://localhost:8000/docs`
+
+### Configuration
+
+Create a local `.env` file in the project root with the database credentials required by the services. Do not commit passwords or other secrets to Git.
+
+### Testing completed
+
+- Docker Compose configuration validated successfully.
+- Control API started successfully in a container.
+- API documentation opened in the browser.
+- Dashboard control settings were tested for saving and loading.
+- Sensor readings were processed by Control Logic, and the Actuator Simulator received commands.
+
+### Git
+
+The implementation was committed as `9d14438` on branch `feature/control-settings-dashboard-redesign`.
