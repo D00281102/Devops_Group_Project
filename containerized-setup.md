@@ -359,13 +359,21 @@ docker compose stop sensor-simulator control-logic actuator-simulator mosquitto
 
 The MQTT broker currently allows anonymous connections for local development. Authentication and appropriate access controls should be added before production deployment.
 
-## Control API Containerization — SCRUM-103
+## Control API
 
-The Control API has been added to the Docker Compose setup so it can run alongside the existing project services.
+The Control API runs as a Docker Compose service alongside the other project components. It provides API endpoints for accessing and managing the control system.
 
-### Build and start
+### Prerequisites
 
-From the project root, run:
+- Docker Desktop is installed and running.
+- The project repository has been cloned.
+- The required environment variables and database settings are configured in the project's local `.env` file.
+
+Do not commit passwords or other secrets to Git.
+
+### Start the Control API
+
+Run these commands from the project root:
 
 ```powershell
 docker compose config --quiet
@@ -375,27 +383,38 @@ docker compose up -d --build control-api
 Check the service status:
 
 ```powershell
-docker compose ps -a
+docker compose ps control-api
 ```
 
-### API documentation
+View the API logs if needed:
 
-When the API is running, open:
+```powershell
+docker compose logs --tail=50 control-api
+```
+
+### Access the API
+
+Once the service is running, open the interactive API documentation:
 
 `http://localhost:8000/docs`
 
-### Configuration
+### Stop the Control API
 
-Create a local `.env` file in the project root with the database credentials required by the services. Do not commit passwords or other secrets to Git.
+To stop only the Control API:
 
-### Testing completed
+```powershell
+docker compose stop control-api
+```
 
-- Docker Compose configuration validated successfully.
-- Control API started successfully in a container.
-- API documentation opened in the browser.
-- Dashboard control settings were tested for saving and loading.
-- Sensor readings were processed by Control Logic, and the Actuator Simulator received commands.
+To rebuild and restart it after code changes:
 
-### Git
+```powershell
+docker compose up -d --build control-api
+```
 
-The implementation was committed as `9d14438` on branch `feature/control-settings-dashboard-redesign`.
+### Troubleshooting
+
+- If the container does not start, check the logs using `docker compose logs control-api`.
+- If port 8000 is already in use, check for another service using that port.
+- If the API cannot connect to the database, check the `.env` settings and confirm that the database service or configured database host is reachable.
+- If the Compose configuration is invalid, run `docker compose config` to display the resolved configuration and look for errors.
