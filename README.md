@@ -5,9 +5,10 @@ front-end interface can read and modify telemetry records.
 
 Built with FastAPI, psycopg 3, and Pydantic.
 
-Each developer runs their own copy of the stack. The API and Postgres do
-not need to be on the same network as the rest of the team. See section
-9.4 if you're not on the same LAN as whoever is hosting the database.
+Each developer runs their own copy of the stack. PostgreSQL runs in Docker
+with a persistent volume, and the API and Kafka consumer connect to it
+through localhost. You can migrate an existing PostgreSQL database or start
+with an empty telemetry table.
 
 > Troubleshooting errors encountered during development are documented
 > separately in Jira under the API workstream. If something breaks, check
@@ -19,8 +20,8 @@ not need to be on the same network as the rest of the team. See section
 
 It sits between the PostgreSQL database and the front-end interface.
 
-    Front-end  ->  API (this folder)  ->  PostgreSQL
-    (teammate)     (you, now)             (iot_telemetry_data table)
+    Front-end -> API -> PostgreSQL in Docker
+                         (iot_telemetry_data table)
 
 The front-end calls HTTP endpoints. This API translates those calls into SQL
 and returns JSON.
@@ -44,6 +45,9 @@ Five endpoints:
     ├── .gitignore              <- ignores .env
     ├── requirements.txt        <- Python dependencies
     ├── Data_Sensor.py          <- MQTT publisher (separate workstream)
+    ├── scripts/
+    │   ├── start_kafka.py      <- starts Kafka services and ingestion
+    │   └── database_consumer.py <- writes Kafka telemetry to PostgreSQL
     └── api/
         ├── __init__.py
         ├── config.py           <- reads .env, builds DATABASE_URL
@@ -89,41 +93,125 @@ From the repo root:
 
 Or manually:
 
-    pip install fastapi uvicorn "psycopg[binary]" python-dotenv psycopg_pool
+    pip install fastapi uvicorn "psycopg[binary]" python-dotenv psycopg_pool kafka-python
 
 ### 3.4 Create your own `.env`
 
 `.env` is gitignored on purpose — every machine has its own copy with its own
-DB values. Create `Prototype/.env` with:
+DB values. Create `Prototype/.env` with the credentials for the Docker
+PostgreSQL container:
 
     DB_HOST=localhost
     DB_PORT=5434
     DB_NAME=postgres
     DB_USER=postgres
-    DB_PASSWORD=<your postgres password>
+    DB_PASSWORD=<choose a password and keep it private>
 
-Notes:
-- `DB_HOST=localhost` if Postgres is on the same machine.
-- `DB_HOST=192.168.1.6` if Postgres is on the other laptop on the network.
-- `DB_NAME` must be the database that actually contains the
-  `iot_telemetry_data` table. On our setup that's `postgres`.
+Use `DB_HOST=localhost` and `DB_PORT=5434` when the API and consumer run on
+Windows and PostgreSQL runs in Docker. `DB_NAME` stays `postgres`; this is
+the same database name as before, now stored in a persistent Docker volume.
+Use the same database name, user, and password when using the `psql` commands
+below. Do not commit or share your `.env` file.
 
-### 3.5 Check Postgres is reachable
+### 3.5 Start PostgreSQL in Docker
 
-    psql -U postgres -h localhost -p 5434 -l
+Check that Docker Desktop is running. If local PostgreSQL already uses port
+5434, either stop its Windows service or change `DB_PORT` in `.env` to an
+available port before starting the container. `DB_PORT` is the host port;
+inside Docker PostgreSQL always listens on 5432.
 
-Should list databases. If `psql` isn't on PATH:
+Start the database from the repository root:
 
-    & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5434 -l
+    docker compose --env-file Prototype/.env up -d postgres
 
-Verify the table exists:
+Wait until it reports healthy:
 
-    psql -U postgres -h localhost -p 5434 -d postgres -c "\dt"
+    docker compose --env-file Prototype/.env ps postgres
 
-You should see `iot_telemetry_data` in the list.
+For the API and Kafka consumer running on Windows, use
+`DB_HOST=localhost` and set `DB_PORT` to the host port you chose in
+`Prototype/.env` (5434 by default). The container's first start creates the
+configured `postgres` database, but **does not** automatically create the
+telemetry table.
 
-If the table isn't there and you're on your own machine, see section 9.4
-Option A for how to create it and load the CSV.
+#### If you already have a PostgreSQL database to keep
+
+Back up the existing database before stopping or changing the local server.
+The following example assumes it is available at `localhost:5434`:
+
+    New-Item -ItemType Directory -Force .\Prototype\data
+    pg_dump -h localhost -p 5434 -U postgres -d postgres --no-owner --no-acl -f .\Prototype\data\telemetry-backup.sql
+
+`pg_dump` prompts for the old database password. If it is not on PATH, run it
+from the PostgreSQL `bin` folder or provide its full path. Once the backup
+succeeds, stop any local PostgreSQL service that is occupying port 5434, then
+start the Docker service using the command above. Wait for it to be healthy
+before restoring:
+
+    psql -h localhost -p 5434 -U postgres -d postgres -v ON_ERROR_STOP=1 -f .\Prototype\data\telemetry-backup.sql
+
+If you changed `DB_PORT`, use that port instead of `5434` in the `psql`
+commands too. The restore copies the existing schema and records into the
+same `postgres` database.
+
+#### If you are starting with an empty database
+
+Connect to the new container:
+
+    psql -h localhost -p 5434 -U postgres -d postgres
+
+At the `postgres` prompt, create the telemetry table:
+
+    CREATE TABLE iot_telemetry_data (
+        records  SERIAL PRIMARY KEY,
+        ts       DOUBLE PRECISION NOT NULL,
+        device   TEXT NOT NULL,
+        co       DOUBLE PRECISION NOT NULL,
+        humidity DOUBLE PRECISION NOT NULL,
+        light    BOOLEAN NOT NULL,
+        lpg      DOUBLE PRECISION NOT NULL,
+        motion   BOOLEAN NOT NULL,
+        smoke    DOUBLE PRECISION NOT NULL,
+        temp     DOUBLE PRECISION NOT NULL
+    );
+
+Then exit with `\q`. If your team has the CSV dataset, you can import it
+from the `Prototype` folder. Open a new PowerShell terminal:
+
+    Set-Location .\Prototype
+    psql -h localhost -p 5434 -U postgres -d postgres
+
+At the `postgres` prompt, run:
+
+    \copy iot_telemetry_data (ts, device, co, humidity, light, lpg, motion, smoke, temp) FROM 'data/iot_telemetry_data.csv' WITH (FORMAT csv, HEADER true);
+
+Then exit with `\q`.
+
+The CSV is not included in every checkout; ask the team for it if it is
+missing. Do not import the CSV if your restored database already has those
+rows.
+
+PostgreSQL data is stored in the Compose `postgres_data` volume. Stopping or
+recreating the container does not remove that volume. `docker compose down`
+preserves it. The current Compose file does not configure a persistent volume
+for Kafka, so Kafka broker data may not survive `down`. Supply the env file
+for every Compose command:
+
+    docker compose --env-file Prototype/.env down
+
+**Do not** run `docker compose --env-file Prototype/.env down -v` unless you
+intentionally want to delete the database and all its data.
+
+### 3.6 Check PostgreSQL and the telemetry table
+
+    psql -h localhost -p 5434 -U postgres -d postgres -c "\dt"
+
+If `psql` isn't on PATH:
+
+    & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h localhost -p 5434 -U postgres -d postgres -c "\dt"
+
+You should see `iot_telemetry_data` before starting the API or Kafka
+consumer.
 
 ---
 
@@ -135,6 +223,7 @@ From the `Prototype` folder:
 
 You must be in `Prototype`, not the repo root — the import path
 `api.main:app` resolves relative to the current directory.
+Start PostgreSQL first using section 3.5.
 
 You should see:
 
@@ -153,6 +242,51 @@ Open in a browser:
 Use Swagger for testing. Click any endpoint, click **Try it out**, paste a
 body, click **Execute**. It handles JSON formatting for you — do NOT try to
 run the bash-style curl command that Swagger shows at the bottom.
+
+### 4.2 Stream sensor data from Kafka into the existing database
+
+The Kafka ingestion process uses the same `Prototype/.env` settings as the
+API and inserts each validated sensor message into the existing
+`iot_telemetry_data` table. It does not create a database or table.
+Start PostgreSQL first using section 3.5 and make sure the telemetry table
+exists.
+
+From the repository root, start the Kafka services and ingestion process:
+
+    python Prototype/scripts/start_kafka.py
+
+Keep this terminal running. In another terminal, start the sensor publisher:
+
+    python Prototype/Data_Sensor.py
+
+The data flow is:
+
+    Sensor -> MQTT -> Kafka (`sensor-telemetry`)
+           -> database consumer -> PostgreSQL (`DB_NAME`, `iot_telemetry_data`)
+
+Use the same `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`
+in `Prototype/.env` that you use for the API. The table must already exist
+with the telemetry columns listed in section 10. The database consumer only
+commits a Kafka offset after its database insert succeeds. As with any
+database/Kafka pair without a shared transaction, a restart in the brief
+period between the insert and offset commit can insert a duplicate row.
+The consumer uses a Kafka consumer group so normal restarts resume from the
+last committed offset.
+
+### 4.3 Stop and restart
+
+Stop the API, sensor, and Kafka consumer with `Ctrl+C` in their terminals.
+Stop Docker services from the repository root with:
+
+    docker compose --env-file Prototype/.env down
+
+This keeps PostgreSQL data in its named volume. Kafka does not currently have
+a persistent volume configured, so its broker data may not survive `down`.
+To start PostgreSQL again, run
+`docker compose --env-file Prototype/.env up -d postgres`. To intentionally
+erase the PostgreSQL volume, Compose supports
+`docker compose --env-file Prototype/.env down -v`; this deletes stored
+database data and should not be used for a normal shutdown.
 
 ---
 
@@ -316,12 +450,12 @@ out no matter how Postgres is configured.
 independent stack on your own machine. If you take that route, everything
 you already did in sections 3.1–3.3 still applies (Python, clone, packages).
 Section 3.4 onwards changes, because you'll be pointing at your own
-database, not the team's. Work through section 9.4 Option A and then come
-back to section 4 to run the API.
+database, not the team's. Work through section 9.4 Option A or B and then
+come back to section 4 to run the API.
 
 You have three options. Pick the one that fits.
 
-**Option A — Load the CSV into your own local Postgres (recommended)**
+**Option A — Load the CSV into your own Postgres installation**
 
 This is the cleanest option. You don't need anyone else's machine.
 
@@ -383,18 +517,14 @@ This is the cleanest option. You don't need anyone else's machine.
 You now have a fully independent dev environment. Nothing depends on anyone
 else's machine.
 
-**Option B — Run Postgres in Docker on your own machine**
+**Option B — Run the existing Postgres database in Docker**
 
-If you have Docker, this skips the Postgres installer entirely:
-
-    docker run --name iot-postgres -e POSTGRES_PASSWORD=yourpassword -p 5434:5432 -d postgres:17
-
-Then load the CSV into it the same way as Option A steps 3–4. `.env` stays
-as `DB_HOST=localhost`, `DB_PORT=5434`. Once your container is up, go back
-to section 4 to run the API.
-
-Your repo already has a `docker-compose.yml` — check whether it already
-defines a Postgres service before starting a separate container.
+The project Compose file runs PostgreSQL with a persistent Docker volume.
+Follow section 3.5 to export your existing local database, start the Compose
+service, and restore the backup. This preserves the current database and
+records while moving PostgreSQL into Docker. Keep `.env` set to
+`DB_HOST=localhost` and `DB_PORT=5434`; the API and Kafka consumer continue
+using the same database settings.
 
 **Option C — Tunnel to the Postgres machine**
 

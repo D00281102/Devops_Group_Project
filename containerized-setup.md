@@ -1,6 +1,6 @@
 # Containerized Kafka Setup
 
-This guide runs Kafka, Kafka UI, and Kafka Connect with Docker Compose. Mosquitto and the Python sensor run outside Docker on Windows. The Kafka consumer is started by the Kafka automation script.
+This guide runs PostgreSQL, Kafka, Kafka UI, and Kafka Connect with Docker Compose. PostgreSQL uses a persistent named volume. Mosquitto, the Python sensor, and the database consumer run outside Docker on Windows.
 
 For the complete manual Windows setup, see [local-setup.md](local-setup.md).
 
@@ -23,7 +23,11 @@ Kafka in Docker
     |
     +--> Kafka UI in Docker: http://localhost:8080
     |
-    +--> Kafka consumer on Windows
+    +--> Database consumer on Windows
+              |
+              v
+        PostgreSQL in Docker
+        (`iot_telemetry_data`, persistent volume)
 ```
 
 ## Prerequisites
@@ -53,6 +57,41 @@ Install the Python dependency:
 py -m pip install -r Prototype/requirements.txt
 ```
 
+## Move the existing database into Docker
+
+Back up the existing local PostgreSQL database before stopping it. Run from
+the repository root while local PostgreSQL is running:
+
+```powershell
+pg_dump -h localhost -p 5434 -U postgres -d postgres --no-owner --no-acl -f .\Prototype\data\telemetry-backup.sql
+```
+
+The backup path is gitignored because it contains database data. If local
+PostgreSQL occupies port 5434, stop its Windows service after creating the
+backup. For PostgreSQL 17, run Administrator PowerShell:
+
+```powershell
+Stop-Service postgresql-x64-17
+```
+
+Start the PostgreSQL container with the credentials from `Prototype/.env`:
+
+```powershell
+docker compose --env-file Prototype/.env up -d postgres
+```
+
+Wait for `docker compose ps postgres` to show the container as healthy.
+
+Restore the backup into the container:
+
+```powershell
+psql -h localhost -p 5434 -U postgres -d postgres -f .\Prototype\data\telemetry-backup.sql
+```
+
+The compose service keeps the database in the `postgres_data` named volume.
+Restarting or running `docker compose down` preserves the data. Avoid
+`docker compose down -v`, which deletes that volume.
+
 ## Network Addresses
 
 Windows applications use the ports:
@@ -73,12 +112,22 @@ MQTT from Kafka Connect: host.docker.internal:1883
 ```
 
 Kafka UI is configured to use `kafka:9093` in `docker-compose.yml`.
+The Windows API and database consumer connect to PostgreSQL at
+`localhost:5434`, as configured in `Prototype/.env`. Other Docker services
+can connect to PostgreSQL using `postgres:5432`.
 
 ## Start the Kafka Services Automatically
 
 From the project root:
 
-The startup script automatically starts Mosquitto, Kafka, Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and the Kafka consumer. Mosquitto uses the project's `Prototype/mosquitto.conf` configuration so that Kafka Connect running in Docker can connect to the MQTT broker.
+Start PostgreSQL separately using the command in **Move the existing
+database into Docker**. The Kafka startup script starts Mosquitto, Kafka,
+Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and a Python
+consumer that writes records into the same PostgreSQL
+`iot_telemetry_data` table. The consumer uses the `Prototype/.env` settings
+shared with the API. Mosquitto uses the project's `Prototype/mosquitto.conf`
+configuration so Kafka Connect running in Docker can connect to the MQTT
+broker.
 
 Run it from the project root:
 
@@ -86,6 +135,9 @@ Run it from the project root:
 Set-Location "C:\Devops_Group_Project" (This is to set your directory)
 py .\Prototype\scripts\start_kafka.py
 ```
+
+Leave this terminal running; it remains attached to the database consumer.
+Start the sensor in another terminal using the command in **Start the Sensor**.
 
 Check the containers:
 
@@ -194,8 +246,10 @@ Stop the Windows processes with `Ctrl+C`, then stop Docker services:
 docker compose down
 ```
 
-Do not use `docker compose down -v` unless you intentionally want to remove Docker volumes and stored Kafka data.
+This stops containers but preserves the PostgreSQL volume and its data. Do
+not use `docker compose down -v` unless you intentionally want to delete the
+database volume and stored Kafka data.
 
 ## Current Scope
 
-The current Compose file containerizes Kafka and Kafka UI only. A fully containerized setup would also need Compose services for Mosquitto, Kafka Connect, the MQTT connector plugin, the sensor, and the Kafka consumer.
+PostgreSQL, Kafka, Kafka UI, and Kafka Connect run in Docker. Mosquitto, the sensor, and the database consumer run on Windows.

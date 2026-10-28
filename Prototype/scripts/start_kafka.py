@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -16,7 +17,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def start_kafka_KafkaUI():
     # Start Kafka and Kafka UI using subprocess
     subprocess.run([
-        'docker', 'compose', 'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
+        'docker', 'compose',
+        '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
+        'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
     ], cwd=PROJECT_ROOT, check=True)
 
 
@@ -91,16 +94,13 @@ def start_kafka_connector():
             raise
 
 
-def start_kafka_consumer():
-    # Display messages from the Kafka sensor topic.
-    return subprocess.Popen([
-        rf"{KAFKA_HOME}\bin\windows\kafka-console-consumer.bat",
-        '--bootstrap-server', 'localhost:9092',
-        '--topic', 'sensor-telemetry',
-        '--from-beginning',
-        '--property',
-        'value.deserializer=org.apache.kafka.common.serialization.StringDeserializer'
-    ])
+def run_database_consumer():
+    # Keep the startup process attached to the active database consumer.
+    subprocess.run(
+        [sys.executable, "-m", "scripts.database_consumer"],
+        cwd=PROJECT_ROOT / "Prototype",
+        check=True,
+    )
 
 
 def start_kafka():
@@ -110,7 +110,7 @@ def start_kafka():
     create_kafka_topic()
     wait_for_connect()
     start_kafka_connector()
-    start_kafka_consumer()
+    run_database_consumer()
 
 
 if __name__ == "__main__":

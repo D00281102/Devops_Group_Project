@@ -277,7 +277,8 @@ Kafka Connect MQTT Source Connector
      ↓ Kafka: sensor-telemetry
 Apache Kafka Broker (localhost:9092)
      ↓
-Kafka Consumer
+Python database consumer
+     ↓ PostgreSQL: existing iot_telemetry_data table
 ```
 
 ## Kafka Components
@@ -292,7 +293,7 @@ The local prototype uses:
 - MQTT source connector version `1.7.9`
 - Kafka topic `sensor-telemetry`
 
-Kafka broker, Kafka Connect, Mosquitto, the consumer, and the sensor are separate processes. Run each long-running process in its own VS Code PowerShell terminal.
+Kafka broker, Kafka Connect, Mosquitto, the database consumer, and the sensor are separate processes. The database consumer uses the existing PostgreSQL database configured in `Prototype/.env`; it does not create a database.
 
 ## Kafka Connect Plugin Setup
 
@@ -356,14 +357,19 @@ In the terminal named `mosquitto_sub`:
 & "C:\Program Files\mosquitto\mosquitto_sub.exe" -h localhost -p 1883 -t sensors/telemetry -v
 ```
 
-### 5. Start a Kafka Consumer
+### 5. Start the Database Consumer
 
-In the terminal named `kafka consumer`:
+In the terminal named `database consumer`, from the `Prototype` folder:
 
 ```powershell
-Set-Location "C:\kafka"
-.\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic sensor-telemetry --from-beginning
+Set-Location "C:\Devops_Group_Project\Prototype"
+py -m scripts.database_consumer
 ```
+
+The consumer reads JSON records from `sensor-telemetry`, validates the
+telemetry fields, and inserts them into the existing `iot_telemetry_data`
+table using the same `Prototype/.env` database settings as the API. Install
+the project dependencies first with `py -m pip install -r requirements.txt`.
 
 ### 6. Start the Sensor
 
@@ -450,7 +456,8 @@ When the sensor is running:
 
 - `mosquitto_sub` displays messages on `sensors/telemetry`.
 - The Kafka Connect connector reads those MQTT messages.
-- The Kafka consumer displays records from `sensor-telemetry`.
+- The database consumer inserts records from `sensor-telemetry` into the
+  configured PostgreSQL `iot_telemetry_data` table.
 - The original sensor JSON is forwarded as the Kafka record value.
 
 ## Troubleshooting
