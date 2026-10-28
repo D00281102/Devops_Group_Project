@@ -1,42 +1,148 @@
 import json
 import paho.mqtt.client as mqtt
+from api.db import get_connection, pool
+from api.control_db import get_control_connection
+import os
 
 # MQTT configuration
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
 ACTUATOR_TOPIC = "actuators/commands"
 
+def get_control_settings():
+    """
+    Retrieve the saved control settings from PostgreSQL.
+    """
+    with get_control_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT temperature_threshold, humidity_threshold, light_enabled
+                FROM control_settings
+                WHERE id = 1
+                """
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        return {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
+
+    return {
+        "temperature_threshold": row[0],
+        "humidity_threshold": row[1],
+        "light_enabled": row[2]
+    }
+
+def get_latest_sensor_data():
+    """
+    Retrieve the latest sensor reading from the PostgreSQL database.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT records, ts, device, co, humidity, light,
+                       lpg, motion, smoke, temp
+                FROM iot_telemetry_data
+                ORDER BY records DESC
+                LIMIT 1
+                """
+            )
+
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "records": row[0],
+        "ts": row[1],
+        "device": row[2],
+        "co": row[3],
+        "humidity": row[4],
+        "light": row[5],
+        "lpg": row[6],
+        "motion": row[7],
+        "smoke": row[8],
+        "temp": row[9]
+    }
+
+def process_database_data(client):
+    """
+    Retrieve the latest sensor reading from the database,
+    evaluate it and publish any required actuator commands.
+    """
+    sensor_data = get_latest_sensor_data()
+
+    if sensor_data is None:
+        print("No sensor data found in database.")
+        return
+
+    print("Latest database sensor reading:")
+    print(json.dumps(sensor_data, indent=4))
+
+    settings = get_control_settings()
+    commands = evaluate_sensor_data(sensor_data, settings)
+
+    if commands:
+        print("Control decisions:")
+
+        for command in commands:
+            print(
+                f"- {command['actuator'].upper()} "
+                f"{command['action']} - {command['reason']}"
+            )
+
+            publish_actuator_command(client, command)
+    else:
+        print("Control decision: No action required")
+
 def on_connect(client, userdata, flags, reason_code, properties):
     """
-    Subscribe to the sensor telemetry topic after connecting to MQTT.
+    Connect to MQTT and subscribe to live sensor readings.
     """
-    print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-    client.subscribe(SENSOR_TOPIC)
-    print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
-    print("Waiting for sensor readings...\n")
+    if reason_code == 0:
+        print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
 
-def evaluate_sensor_data(sensor_data):
+        client.subscribe(SENSOR_TOPIC)
+        print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
+    else:
+        print(f"MQTT connection failed: {reason_code}")
+
+def evaluate_sensor_data(sensor_data, settings=None):
     """
-    Evaluate sensor readings and generate actuator commands.
+    Evaluate sensor readings using configurable control settings.
     """
+    if settings is None:
+        settings = {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
+
     commands = []
 
-    if sensor_data["temp"] >= 25:
+    if sensor_data["temp"] >= settings["temperature_threshold"]:
         commands.append({
             "actuator": "fan",
             "action": "ON",
             "reason": "High temperature detected"
         })
 
-    if sensor_data["humidity"] >= 70:
+    if sensor_data["humidity"] >= settings["humidity_threshold"]:
         commands.append({
             "actuator": "dehumidifier",
             "action": "ON",
             "reason": "High humidity detected"
         })
 
-    if sensor_data["light"]:
+    if settings["light_enabled"] and sensor_data["light"]:
         commands.append({
             "actuator": "light",
             "action": "ON",
@@ -70,7 +176,8 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-        commands = evaluate_sensor_data(sensor_data)
+        settings = get_control_settings()
+        commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
             print("Control decisions:")
@@ -91,21 +198,39 @@ def on_message(client, userdata, message):
     except json.JSONDecodeError:
             print("Error: Received message is not valid JSON.")
 
-
-
 def start_control_logic():
     """
-    Connect to MQTT and listen for incoming sensor readings.
+    Connect to MQTT, process the latest database reading,
+    and continuously listen for live sensor readings.
     """
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     client.on_connect = on_connect
     client.on_message = on_message
 
+    print("Starting IoT control logic...")
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-    print("Starting IoT control logic...")
-    client.loop_forever()
+    try:
+        client.loop_start()
+
+        print("Retrieving latest sensor reading from database...\n")
+        process_database_data(client)
+
+        print(f"Listening for live sensor readings on: {SENSOR_TOPIC}")
+
+        # Keep the control logic running to receive MQTT messages.
+        while True:
+            import time
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("Stopping IoT control logic...")
+
+    finally:
+        client.loop_stop()
+        client.disconnect()
+        pool.close()
 
 
 if __name__ == "__main__":

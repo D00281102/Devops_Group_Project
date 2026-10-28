@@ -1,2 +1,8 @@
 Prototype/data/
 __pycache__/
+# Local Grafana backups
+grafana.db.backup
+grafana-dashboard-backup.json
+
+# Local environment variables and secrets
+.env

@@ -16,6 +16,14 @@ services:
       timeout: 3s
       retries: 20
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./Prototype/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
   kafka:
     image: apache/kafka-native
     ports:
@@ -47,7 +55,7 @@ services:
   kafka-ui:
     image: kafbat/kafka-ui:main
     ports:
-      - 8080:8080
+      - "8081:8080"
     environment:
       DYNAMIC_CONFIG_ENABLED: "true"
       KAFKA_CLUSTERS_0_NAME: local
@@ -84,6 +92,91 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./Prototype/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./Prototype/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD:-${DB_PASSWORD}}
+    restart: unless-stopped
+
+  control-logic:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.control
+    image: iot-control-logic:latest
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_PORT: "5432"
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+
+  sensor-simulator:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.sensor
+    image: iot-sensor-simulator:latest
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+    depends_on:
+      mosquitto:
+        condition: service_started
+
+  actuator-simulator:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.actuator
+    image: iot-actuator-simulator:latest
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+    depends_on:
+      mosquitto:
+        condition: service_started
+
+  control-api:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.api
+    image: iot-control-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_PORT: "${CONTROL_DB_PORT:-5432}"
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  grafana-data:

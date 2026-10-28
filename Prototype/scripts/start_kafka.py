@@ -7,20 +7,36 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from start_mqtt import start_mqtt
+from dotenv import dotenv_values
 
 KAFKA_HOME = r"C:\kafka"
 CONNECT_URL = "http://localhost:8083"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DB_PORT = int(
+    dotenv_values(PROJECT_ROOT / "Prototype" / ".env").get("DB_PORT") or 5434
+)
 
 
 def start_kafka_KafkaUI():
-    # Start Kafka and Kafka UI using subprocess
+    # Start the shared database, MQTT broker, Kafka, UI, and Connect services.
     subprocess.run([
         'docker', 'compose',
         '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
-        'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
+        'up', '-d', 'postgres', 'mosquitto', 'kafka', 'kafka-ui', 'kafka-connect'
     ], cwd=PROJECT_ROOT, check=True)
+
+
+def wait_for_postgres():
+    # Wait until PostgreSQL accepts host connections before starting the consumer.
+    for attempt in range(30):
+        try:
+            with socket.create_connection(("localhost", DB_PORT), timeout=2):
+                return
+        except OSError:
+            print(f"Waiting for PostgreSQL... ({attempt + 1}/30)")
+            time.sleep(2)
+
+    raise RuntimeError("PostgreSQL did not become ready")
 
 
 def wait_for_kafka():
@@ -104,8 +120,8 @@ def run_database_consumer():
 
 
 def start_kafka():
-    start_mqtt()
     start_kafka_KafkaUI()
+    wait_for_postgres()
     wait_for_kafka()
     create_kafka_topic()
     wait_for_connect()
