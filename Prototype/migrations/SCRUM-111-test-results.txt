@@ -1,0 +1,7 @@
+ id | building_id | temperature_threshold | humidity_threshold | light_enabled 
+----+-------------+-----------------------+--------------------+---------------
+  1 |             |                    28 |                 70 | t
+  2 |           1 |                    25 |                 65 | t
+  5 |           2 |                    22 |                 60 | f
+(3 rows)
+
