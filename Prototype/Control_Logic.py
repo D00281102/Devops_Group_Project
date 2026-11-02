@@ -8,7 +8,7 @@ import os
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
-ACTUATOR_TOPIC = "actuators/commands"
+
 
 
 def get_building_id(device_id):
@@ -161,7 +161,7 @@ def process_database_data(client):
                 f"{command['action']} - {command['reason']}"
             )
 
-            publish_actuator_command(client, command)
+            publish_actuator_command(client, command, building_id)
     else:
         print("Control decision: No action required")
 
@@ -171,7 +171,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     """
     if reason_code == 0:
         print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+        print("Actuator commands will be published to building-specific MQTT topics.")
 
         client.subscribe(SENSOR_TOPIC)
         print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
@@ -214,20 +214,20 @@ def evaluate_sensor_data(sensor_data, settings=None):
 
     return commands
 
-def publish_actuator_command(client, command):
+def publish_actuator_command(client, command, building_id):
     """
-    Publish an actuator command to the MQTT broker.
+    Publish an actuator command to the correct building.
     """
-    payload = json.dumps(command)
+    topic = f"buildings/{building_id}/actuators/commands"
 
-    client.publish(
-        ACTUATOR_TOPIC,
-        payload
-    )
+    # Include the building ID so the receiver can verify it.
+    payload_data = {**command, "building_id": building_id}
+    payload = json.dumps(payload_data)
 
-    print(f"Published actuator command to: {ACTUATOR_TOPIC}")
-    print(json.dumps(command, indent=4))
+    client.publish(topic, payload)
 
+    print(f"Published actuator command to: {topic}")
+    print(json.dumps(payload_data, indent=4))
 
 def on_message(client, userdata, message):
     """
@@ -265,7 +265,7 @@ def on_message(client, userdata, message):
                     f"{command['action']} - {command['reason']}"
                 )
 
-                publish_actuator_command(client, command)
+                publish_actuator_command(client, command, building_id)
 
         else:
             print("Control decision: No action required")
