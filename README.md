@@ -87,10 +87,9 @@ From the repo root:
 
     pip install -r Prototype/requirements.txt
 
-Install all dependencies using the requirements file:
+Or manually:
 
-```powershell
-pip install -r Prototype/requirements.txt
+    pip install fastapi uvicorn "psycopg[binary]" python-dotenv psycopg_pool
 
 ### 3.4 Create your own `.env`
 
@@ -210,109 +209,7 @@ which the connection pool in `api/db.py` uses.
 
 ---
 
-## 7. User Authentication API (SCRUM-140)
-
-The API includes user registration and login functionality using FastAPI, PostgreSQL, Argon2id password hashing and JSON Web Tokens (JWT).
-
-Authentication uses a separate PostgreSQL database connection from the telemetry and control-settings connections.
-
-### 7.1 Authentication endpoints
-
-| Method | Path | Purpose | Expected response |
-|---|---|---|---|
-| POST | `/auth/register` | Register a new user | 201 Created |
-| POST | `/auth/login` | Authenticate an existing user | 200 OK |
-| GET | `/auth/me` | Retrieve the currently authenticated user's details | 200 OK |
-
-The `/auth/me` endpoint requires a valid Bearer token in the Authorization header.
-
-### 7.2 Authentication database
-
-The authentication schema is located at:
-
-`Prototype/docs/scrum108_schema.sql`
-
-It creates the following tables:
-
-- `users` – registered user details and password hashes.
-- `buildings` – building records.
-- `building_members` – user membership and role information.
-- `building_devices` – devices associated with buildings.
-
-It also adds a `building_id` relationship and index to the existing `control_settings` table.
-
-The schema expects the `control_settings` table to exist before it is executed.
-
-### 7.3 Authentication environment variables
-
-Add the following settings to your local `Prototype/.env` file:
-
-```dotenv
-AUTH_DB_HOST=localhost
-AUTH_DB_PORT=5436
-AUTH_DB_NAME=scrum108_test_db
-AUTH_DB_USER=postgres
-AUTH_DB_PASSWORD=<your_auth_database_password>
-AUTH_SECRET_KEY=<your_private_random_secret>
-```
-
-Use your own database credentials and generate a strong random JWT signing secret. Do not commit `.env` files or share secret values.
-
-The port and database name above represent the local development configuration. Developers can use different values for their own PostgreSQL installations.
-
-### 7.4 Create the authentication database
-
-Create a PostgreSQL database for authentication, then execute the schema against it.
-
-For example, using `psql`:
-
-```powershell
-createdb -U postgres -h localhost -p 5436 scrum108_test_db
-```
-
-The database must also have the existing `control_settings` table before applying the complete schema.
-
-From the `Prototype` directory, apply the schema:
-
-```powershell
-psql -U postgres -h localhost -p 5436 -d scrum108_test_db -f docs/scrum108_schema.sql
-```
-
-If the database or required table already exists, check the existing setup before running the schema.
-
-### 7.5 Password security and JWT authentication
-
-- Passwords are hashed using Argon2id before being stored.
-- Plain-text passwords are not stored in the users table.
-- Successful login returns a JWT access token.
-- Tokens use HS256 signing and expire after 30 minutes.
-- Protected requests must include:
-
-```http
-Authorization: Bearer <your_access_token>
-```
-
-### 7.6 Testing authentication
-
-Use Swagger UI:
-
-`http://127.0.0.1:8000/docs`
-
-Test the endpoints in this order:
-
-1. Register a user using `POST /auth/register`.
-2. Log in using `POST /auth/login`.
-3. Copy the returned access token.
-4. Select **Authorize** in Swagger and enter the Bearer token.
-5. Call `GET /auth/me` to retrieve the authenticated user's profile.
-
-Expected error responses include:
-
-- `401` – incorrect login credentials, missing token or invalid/expired token.
-- `409` – email address already registered.
-- `422` – request validation failed.
-
-## 8. Error responses
+## 7. Error responses
 
 All errors return JSON in the shape:
 
@@ -332,7 +229,7 @@ to raise them yourself. The 503 and 409 come from `api/errors.py`.
 
 ---
 
-## 9. Architecture notes — why it's built this way
+## 8. Architecture notes — why it's built this way
 
 ### Connection pool, not one connection per request
 `api/db.py` creates a single `ConnectionPool` at import time. Every request
@@ -361,7 +258,7 @@ they're safe. The values are still parameterised.
 
 ---
 
-## 10. Network setup — if Postgres is on another machine
+## 9. Network setup — if Postgres is on another machine
 
 This section only applies if you're trying to reach the team's Postgres
 over a network. If you're running your own Postgres locally, go straight to
@@ -516,7 +413,7 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 
 ---
 
-## 11. What the front-end teammate needs to know
+## 10. What the front-end teammate needs to know
 
 - Base URL when running locally: `http://127.0.0.1:8000`
 - All responses are JSON.
@@ -534,7 +431,7 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 
 ---
 
-## 12. Git workflow
+## 11. Git workflow
 
 - Work on your own branch (`Jo`, `Bright`, `Daniils`, `Simon`, ...).
 - Push to your branch: `git push origin <branch>`.
@@ -546,7 +443,7 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 
 ---
 
-## 13. Quick reference
+## 12. Quick reference
 
 Start the server:
 
