@@ -5,3 +5,5 @@ psycopg[binary]
 python-dotenv
 psycopg_pool
 requests
+pwdlib[argon2]
+PyJWT

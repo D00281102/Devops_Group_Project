@@ -5,10 +5,13 @@ from api.routes import router
 from api.analytics_routes import analytics_router
 from api.errors import db_connection_error_handler, db_integrity_error_handler
 from api.control_routes import control_router
+from api.auth import router as auth_router
+
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create FastAPI app instance and register exception handlers for database errors
+# Create FastAPI app
 app = FastAPI(title="IoT Telemetry API", version="0.1.0")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -16,17 +19,23 @@ app.add_middleware(
         "http://localhost:5500",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "PUT"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "PUT"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
-app.add_exception_handler(OperationalError, db_connection_error_handler)
-app.add_exception_handler(IntegrityError, db_integrity_error_handler)
+# Register exception handlers
+app.add_exception_handler(
+    OperationalError, db_connection_error_handler
+)
+app.add_exception_handler(
+    IntegrityError, db_integrity_error_handler
+)
 
 # Include API routers
 app.include_router(router)
 app.include_router(analytics_router)
 app.include_router(control_router)
+app.include_router(auth_router)
 
 
 @app.get("/")
