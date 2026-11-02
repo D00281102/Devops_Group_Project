@@ -1,4 +1,4 @@
-import json
+﻿import json
 import paho.mqtt.client as mqtt
 from api.db import get_connection, pool
 from api.control_db import get_control_connection
@@ -9,6 +9,33 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
 ACTUATOR_TOPIC = "actuators/commands"
+
+
+def get_building_id(device_id):
+    """
+    Find which building a sensor device belongs to.
+    """
+    if not device_id:
+        return None
+
+    with get_control_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT building_id
+                FROM building_devices
+                WHERE device_id = %s
+                """,
+                (device_id,)
+            )
+            row = cur.fetchone()
+
+    # Return None if the device isn't registered.
+    if row is None:
+        return None
+
+    return row[0]
+
 
 
 def get_control_settings(building_id=None):
@@ -39,12 +66,19 @@ def get_control_settings(building_id=None):
 
             row = cur.fetchone()
 
+
     if row is None:
+        # Don't control a building without saved settings.
+        if building_id is not None:
+            return None
+
+        # Keep the original single-building defaults.
         return {
             "temperature_threshold": 25,
             "humidity_threshold": 70,
             "light_enabled": True
         }
+
 
     return {
         "temperature_threshold": row[0],
@@ -101,7 +135,21 @@ def process_database_data(client):
     print("Latest database sensor reading:")
     print(json.dumps(sensor_data, indent=4))
 
-    settings = get_control_settings()
+
+    # Find which building this sensor belongs to.
+    building_id = get_building_id(sensor_data.get("device"))
+
+    if building_id is None:
+        print("Unknown sensor device. Skipping control decisions.")
+        return
+
+    # Use the settings for this building.
+    settings = get_control_settings(building_id)
+
+    if settings is None:
+        print(f"No control settings found for Building {building_id}. Skipping.")
+        return
+
     commands = evaluate_sensor_data(sensor_data, settings)
 
     if commands:
@@ -191,7 +239,21 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-        settings = get_control_settings()
+
+        # Find which building sent this sensor reading.
+        building_id = get_building_id(sensor_data.get("device"))
+
+        if building_id is None:
+            print("Unknown sensor device. Skipping control decisions.")
+            return
+
+        # Apply the settings for this building.
+        settings = get_control_settings(building_id)
+
+        if settings is None:
+            print(f"No control settings found for Building {building_id}. Skipping.")
+            return
+
         commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
