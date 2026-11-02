@@ -11,12 +11,15 @@ from start_mqtt import start_mqtt
 KAFKA_HOME = r"C:\kafka"
 CONNECT_URL = "http://localhost:8083"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = PROJECT_ROOT / "Prototype" / ".env"
 
 
 def start_kafka_KafkaUI():
     # Start Kafka and Kafka UI using subprocess
     subprocess.run([
-        'docker', 'compose', 'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
+        'docker', 'compose',
+        '--env-file', str(ENV_FILE),
+        'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
     ], cwd=PROJECT_ROOT, check=True)
 
 
