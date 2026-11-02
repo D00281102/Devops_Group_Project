@@ -623,11 +623,109 @@
                 grid-template-columns: 1fr;
             }
         }
+                [hidden] {
+            display: none !important;
+        }
+
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 35px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .login-card h1 {
+            margin: 18px 0 8px;
+        }
+
+        .login-card > p {
+            margin-bottom: 25px;
+            color: #777;
+        }
+
+        .login-card input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .user-panel {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .user-details span {
+            font-size: 12px;
+            color: #777;
+        }
+
+        .logout-button {
+            padding: 10px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+        }
     </style>
 </head>
 
 <body>
-<div class="layout">
+    <div id="login-screen" class="login-screen">
+    <div class="login-card">
+        <div class="brand-icon">⌘</div>
+
+        <h1>IoT Control Centre</h1>
+        <p>Sign in to access your control dashboard.</p>
+
+        <form id="login-form">
+            <div class="field">
+                <label for="login-email">Email address</label>
+                <input
+                    type="email"
+                    id="login-email"
+                    placeholder="Enter your email"
+                    required
+                >
+            </div>
+
+            <div class="field">
+                <label for="login-password">Password</label>
+                <input
+                    type="password"
+                    id="login-password"
+                    placeholder="Enter your password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="save-button" id="login-button">
+                Sign In
+            </button>
+
+            <p id="login-status" role="status" aria-live="polite"></p>
+        </form>
+    </div>
+</div>
+<div class="layout" id="dashboard" hidden>
     <aside class="sidebar">
         <div class="brand">
             <div class="brand-icon">⌘</div>
@@ -653,11 +751,22 @@
                     Configure your environment and review the latest saved settings.
                 </p>
             </div>
+            <div class="user-panel">
+    <div class="user-details">
+        <strong id="current-user-name">User</strong>
+        <span id="current-user-email"></span>
+    </div>
 
-            <div class="connection">
-                <span class="dot" id="connection-dot"></span>
-                <span id="connection-text">Checking API...</span>
-            </div>
+    <button type="button" id="logout-button" class="logout-button">
+        Logout
+    </button>
+</div>
+
+<div class="connection">
+    <span class="dot" id="connection-dot"></span>
+    <span id="connection-text">Checking API...</span>
+</div>
+
         </header>
 
         <div class="dashboard">
@@ -877,169 +986,330 @@
 </div>
 
 <script>
-    const form = document.getElementById("settings-form");
-    const temperatureInput = document.getElementById("temperature");
-    const humidityInput = document.getElementById("humidity");
-    const lightInput = document.getElementById("light");
-    const saveButton = document.getElementById("save-button");
-    const saveButtonText = document.getElementById("save-button-text");
-    const statusMessage = document.getElementById("status");
+const form = document.getElementById("settings-form");
+const temperatureInput = document.getElementById("temperature");
+const humidityInput = document.getElementById("humidity");
+const lightInput = document.getElementById("light");
+const saveButton = document.getElementById("save-button");
+const saveButtonText = document.getElementById("save-button-text");
+const statusMessage = document.getElementById("status");
 
-    const currentTemperature = document.getElementById("current-temperature");
-    const currentHumidity = document.getElementById("current-humidity");
-    const currentLight = document.getElementById("current-light");
-    const updatedAt = document.getElementById("updated-at");
-    const lightDescription = document.getElementById("light-description");
-    const connectionDot = document.getElementById("connection-dot");
-    const connectionText = document.getElementById("connection-text");
+const currentTemperature = document.getElementById("current-temperature");
+const currentHumidity = document.getElementById("current-humidity");
+const currentLight = document.getElementById("current-light");
+const updatedAt = document.getElementById("updated-at");
+const lightDescription = document.getElementById("light-description");
+const connectionDot = document.getElementById("connection-dot");
+const connectionText = document.getElementById("connection-text");
 
-    const API_URL = "http://127.0.0.1:8000/control-settings";
+// Login elements
+const loginScreen = document.getElementById("login-screen");
+const dashboard = document.getElementById("dashboard");
+const loginForm = document.getElementById("login-form");
+const loginEmail = document.getElementById("login-email");
+const loginPassword = document.getElementById("login-password");
+const loginStatus = document.getElementById("login-status");
+const loginButton = document.getElementById("login-button");
+const logoutButton = document.getElementById("logout-button");
 
-    function showStatus(message, type = "") {
-        statusMessage.textContent = message;
-        statusMessage.className = type;
+const currentUserName = document.getElementById("current-user-name");
+const currentUserEmail = document.getElementById("current-user-email");
+
+const API_BASE_URL = "http://127.0.0.1:8000";
+const API_URL = API_BASE_URL + "/control-settings";
+
+let token = sessionStorage.getItem("access_token");
+
+function showLogin(message = "", type = "") {
+    token = null;
+    sessionStorage.removeItem("access_token");
+
+    dashboard.hidden = true;
+    loginScreen.hidden = false;
+
+    loginStatus.textContent = message;
+    loginStatus.className = type;
+
+    loginPassword.value = "";
+}
+
+function showDashboard(user) {
+    loginScreen.hidden = true;
+    dashboard.hidden = false;
+
+    currentUserName.textContent = user.full_name;
+    currentUserEmail.textContent = user.email;
+}
+
+function showStatus(message, type = "") {
+    statusMessage.textContent = message;
+    statusMessage.className = type;
+}
+
+function setConnection(online) {
+    connectionDot.classList.toggle("online", online);
+    connectionText.textContent = online
+        ? "API Connected"
+        : "API Disconnected";
+}
+
+// Make requests using the current JWT token
+async function authenticatedFetch(url, options = {}) {
+    const headers = {
+        ...(options.headers || {}),
+        Authorization: "Bearer " + token
+    };
+
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
+
+    if (response.status === 401) {
+        showLogin("Your session has expired. Please sign in again.");
+        throw new Error("Session expired.");
     }
 
-    function setConnection(online) {
-        connectionDot.classList.toggle("online", online);
-        connectionText.textContent = online ? "API Connected" : "API Disconnected";
-    }
+    return response;
+}
 
-    function displaySettings(settings) {
-        temperatureInput.value = settings.temperature_threshold;
-        humidityInput.value = settings.humidity_threshold;
-        lightInput.checked = settings.light_enabled;
+// Login form
+loginForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
 
-        currentTemperature.textContent =
-            Number(settings.temperature_threshold) + " °C";
-        currentHumidity.textContent =
-            Number(settings.humidity_threshold) + "%";
+    loginButton.disabled = true;
+    loginButton.textContent = "Signing in...";
+    loginStatus.textContent = "";
 
-        currentLight.textContent = settings.light_enabled ? "ON" : "OFF";
-        currentLight.classList.toggle("off", !settings.light_enabled);
+    try {
+        const response = await fetch(API_BASE_URL + "/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                email: loginEmail.value,
+                password: loginPassword.value
+            })
+        });
 
-        lightDescription.textContent = settings.light_enabled
-            ? "Light is enabled."
-            : "Light is disabled.";
+        const data = await response.json();
 
-        if (settings.updated_at) {
-            const date = new Date(settings.updated_at);
-            updatedAt.textContent = Number.isNaN(date.getTime())
-                ? settings.updated_at
-                : date.toLocaleString();
+        if (!response.ok) {
+            throw new Error(data.detail || "Login failed.");
+        }
+
+        token = data.access_token;
+        sessionStorage.setItem("access_token", token);
+
+        const userResponse = await authenticatedFetch(
+            API_BASE_URL + "/auth/me"
+        );
+
+        if (!userResponse.ok) {
+            throw new Error("Could not retrieve user details.");
+        }
+
+        const userData = await userResponse.json();
+
+        showDashboard(userData.user);
+        loginForm.reset();
+
+        await loadSettings();
+
+    } catch (error) {
+        if (token) {
+            showLogin(error.message);
         } else {
-            updatedAt.textContent = "No timestamp available";
+            loginStatus.textContent = error.message;
+            loginStatus.className = "error";
         }
+    } finally {
+        loginButton.disabled = false;
+        loginButton.textContent = "Sign In";
     }
+});
 
-    async function loadSettings() {
-        showStatus("Loading saved settings...");
-        updatedAt.textContent = "Loading...";
+// Logout
+logoutButton.addEventListener("click", function () {
+    showLogin("You have been logged out successfully.", "success");
+});
+
+// Display settings returned by the API
+function displaySettings(settings) {
+    temperatureInput.value = settings.temperature_threshold;
+    humidityInput.value = settings.humidity_threshold;
+    lightInput.checked = settings.light_enabled;
+
+    currentTemperature.textContent =
+        Number(settings.temperature_threshold) + " °C";
+
+    currentHumidity.textContent =
+        Number(settings.humidity_threshold) + "%";
+
+    currentLight.textContent = settings.light_enabled ? "ON" : "OFF";
+    currentLight.classList.toggle("off", !settings.light_enabled);
+
+    lightDescription.textContent = settings.light_enabled
+        ? "Light is enabled."
+        : "Light is disabled.";
+
+    if (settings.updated_at) {
+        const date = new Date(settings.updated_at);
+        updatedAt.textContent = Number.isNaN(date.getTime())
+            ? settings.updated_at
+            : date.toLocaleString();
+    } else {
+        updatedAt.textContent = "No timestamp available";
+    }
+}
+
+// Load settings using the JWT token
+async function loadSettings() {
+    showStatus("Loading saved settings...");
+    updatedAt.textContent = "Loading...";
+    setConnection(false);
+
+    try {
+        const response = await authenticatedFetch(API_URL);
+
+        if (!response.ok) {
+            throw new Error("Could not load settings.");
+        }
+
+        const settings = await response.json();
+
+        displaySettings(settings);
+        setConnection(true);
+        showStatus("Saved settings loaded.", "success");
+
+    } catch (error) {
+        if (error.message === "Session expired.") return;
+
         setConnection(false);
+        updatedAt.textContent = "Unable to retrieve timestamp";
+        showStatus(
+            "Unable to load settings. Check the API connection.",
+            "error"
+        );
+    }
+}
 
-        try {
-            const response = await fetch(API_URL);
+// Update light description when switch changes
+lightInput.addEventListener("change", function () {
+    lightDescription.textContent = lightInput.checked
+        ? "Light is enabled."
+        : "Light is disabled.";
+});
 
-            if (!response.ok) {
-                throw new Error("Could not load settings.");
-            }
+// Save settings using the JWT token
+form.addEventListener("submit", async function (event) {
+    event.preventDefault();
 
-            const settings = await response.json();
-            displaySettings(settings);
-            setConnection(true);
-            showStatus("Saved settings loaded.", "success");
-        } catch (error) {
-            setConnection(false);
-            updatedAt.textContent = "Unable to retrieve timestamp";
-            showStatus(
-                "Unable to load settings. Check that the API is running.",
-                "error"
-            );
-        }
+    if (!form.reportValidity()) return;
+
+    const temperature = Number(temperatureInput.value);
+    const humidity = Number(humidityInput.value);
+
+    if (
+        !Number.isFinite(temperature) ||
+        temperature < -50 ||
+        temperature > 100
+    ) {
+        showStatus("Temperature must be between -50 and 100 °C.", "error");
+        temperatureInput.focus();
+        return;
     }
 
-    lightInput.addEventListener("change", function () {
-        lightDescription.textContent = lightInput.checked
-            ? "Light is enabled."
-            : "Light is disabled.";
-    });
+    if (
+        !Number.isFinite(humidity) ||
+        humidity < 0 ||
+        humidity > 100
+    ) {
+        showStatus("Humidity must be between 0 and 100%.", "error");
+        humidityInput.focus();
+        return;
+    }
 
-    form.addEventListener("submit", async function (event) {
-        event.preventDefault();
+    const settings = {
+        temperature_threshold: temperature,
+        humidity_threshold: humidity,
+        light_enabled: lightInput.checked
+    };
 
-        if (!form.reportValidity()) {
-            return;
-        }
+    saveButton.disabled = true;
+    saveButton.classList.add("loading");
+    saveButtonText.textContent = "Saving...";
+    showStatus("Saving settings...");
 
-        const temperature = Number(temperatureInput.value);
-        const humidity = Number(humidityInput.value);
+    try {
+        const response = await authenticatedFetch(API_URL, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(settings)
+        });
 
-        if (
-            !Number.isFinite(temperature) ||
-            temperature < -50 ||
-            temperature > 100
-        ) {
-            showStatus("Temperature must be between -50 and 100 °C.", "error");
-            temperatureInput.focus();
-            return;
-        }
-
-        if (
-            !Number.isFinite(humidity) ||
-            humidity < 0 ||
-            humidity > 100
-        ) {
-            showStatus("Humidity must be between 0 and 100%.", "error");
-            humidityInput.focus();
-            return;
-        }
-
-        const settings = {
-            temperature_threshold: temperature,
-            humidity_threshold: humidity,
-            light_enabled: lightInput.checked
-        };
-
-        saveButton.disabled = true;
-        saveButton.classList.add("loading");
-        saveButtonText.textContent = "Saving...";
-        showStatus("Saving settings...");
-
-        try {
-            const response = await fetch(API_URL, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(settings)
-            });
-
-            if (!response.ok) {
-                if (response.status === 422) {
-                    throw new Error("The API rejected the values. Check the limits.");
-                }
-                throw new Error("Could not save settings.");
+        if (!response.ok) {
+            if (response.status === 422) {
+                throw new Error("The API rejected the values. Check the limits.");
             }
 
-            const savedSettings = await response.json();
-            displaySettings(savedSettings);
-            setConnection(true);
-            showStatus("Settings saved successfully!", "success");
-        } catch (error) {
-            setConnection(false);
-            showStatus(
-                "Failed to save settings. The API may be unavailable. " +
-                "Please check the connection and try again.",
-                "error"
-            );
-        } finally {
-            saveButton.disabled = false;
-            saveButton.classList.remove("loading");
-            saveButtonText.textContent = "Save Settings";
+            throw new Error("Could not save settings.");
         }
-    });
 
-    loadSettings();
+        const savedSettings = await response.json();
+
+        displaySettings(savedSettings);
+        setConnection(true);
+        showStatus("Settings saved successfully!", "success");
+
+    } catch (error) {
+        if (error.message === "Session expired.") return;
+
+        setConnection(false);
+        showStatus(
+            "Failed to save settings. Check the API connection and try again.",
+            "error"
+        );
+    } finally {
+        saveButton.disabled = false;
+        saveButton.classList.remove("loading");
+        saveButtonText.textContent = "Save Settings";
+    }
+});
+
+// Check whether a previous browser session is still valid
+async function checkSession() {
+    if (!token) {
+        showLogin();
+        return;
+    }
+
+    try {
+        const response = await authenticatedFetch(
+            API_BASE_URL + "/auth/me"
+        );
+
+        if (!response.ok) {
+            showLogin("Please sign in again.");
+            return;
+        }
+
+        const userData = await response.json();
+
+        showDashboard(userData.user);
+        await loadSettings();
+
+    } catch (error) {
+        if (error.message !== "Session expired.") {
+            showLogin("Unable to verify your session. Please sign in.");
+        }
+    }
+}
+
+checkSession();
 </script>
 </body>
 </html>
