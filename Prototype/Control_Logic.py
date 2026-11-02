@@ -10,19 +10,33 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
 ACTUATOR_TOPIC = "actuators/commands"
 
-def get_control_settings():
+
+def get_control_settings(building_id=None):
     """
-    Retrieve the saved control settings from PostgreSQL.
+    Retrieve control settings for a specific building from PostgreSQL.
     """
     with get_control_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT temperature_threshold, humidity_threshold, light_enabled
-                FROM control_settings
-                WHERE id = 1
-                """
-            )
+            if building_id is None:
+                # Use the original single-building settings.
+                cur.execute(
+                    """
+                    SELECT temperature_threshold, humidity_threshold, light_enabled
+                    FROM control_settings
+                    WHERE id = 1
+                    """
+                )
+            else:
+                # Get settings for the selected building.
+                cur.execute(
+                    """
+                    SELECT temperature_threshold, humidity_threshold, light_enabled
+                    FROM control_settings
+                    WHERE building_id = %s
+                    """,
+                    (building_id,)
+                )
+
             row = cur.fetchone()
 
     if row is None:
@@ -37,6 +51,7 @@ def get_control_settings():
         "humidity_threshold": row[1],
         "light_enabled": row[2]
     }
+
 
 def get_latest_sensor_data():
     """
