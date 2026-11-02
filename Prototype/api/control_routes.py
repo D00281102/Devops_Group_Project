@@ -1,18 +1,23 @@
-from fastapi import APIRouter
+
+from fastapi import APIRouter, Depends
 
 from api.control_db import get_control_connection
 from api.models import ControlSettings
+from api.auth import get_current_user
 
 control_router = APIRouter(tags=["control-settings"])
 
 
 @control_router.get("/control-settings", response_model=ControlSettings)
-def get_control_settings():
+def get_control_settings(
+    current_user: dict = Depends(get_current_user)
+):
     with get_control_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT temperature_threshold, humidity_threshold, light_enabled, updated_at
+                SELECT temperature_threshold, humidity_threshold,
+                       light_enabled, updated_at
                 FROM control_settings
                 WHERE id = 1
                 """
@@ -43,7 +48,10 @@ def get_control_settings():
 
 
 @control_router.put("/control-settings", response_model=ControlSettings)
-def update_control_settings(payload: ControlSettings):
+def update_control_settings(
+    payload: ControlSettings,
+    current_user: dict = Depends(get_current_user)
+):
     with get_control_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
