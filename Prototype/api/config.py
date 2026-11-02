@@ -10,7 +10,10 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", 5434))
 DB_NAME = os.getenv("DB_NAME", "postgres")
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "d00215474")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+if not DB_PASSWORD:
+    raise RuntimeError("DB_PASSWORD is missing from Prototype/.env")
 
 #Full connection string that psycopg will use
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
