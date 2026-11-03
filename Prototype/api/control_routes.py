@@ -1,104 +1,85 @@
-from fastapi import APIRouter, Depends, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.control_db import get_control_connection
 from api.models import ControlSettings
 from api.auth import get_current_user
-from api.auth_db import get_auth_connection
-
 
 control_router = APIRouter(tags=["control-settings"])
 
 
-def check_building_access(building_id: int, current_user: dict):
+def get_user_building(cur, user_id, building_id=None, require_admin=False):
+    query = """
+        SELECT b.building_id, b.building_name, bm.role
+        FROM buildings b
+        JOIN building_members bm
+            ON b.building_id = bm.building_id
+        WHERE bm.user_id = %s
+          AND bm.status = 'approved'
     """
-    Check whether the logged-in user has approved access to a building.
-    Return their building role if access is allowed.
-    """
-    with get_auth_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT role
-                FROM building_members
-                WHERE user_id = %s
-                  AND building_id = %s
-                  AND status = 'approved'
-                """,
-                (current_user["user_id"], building_id)
-            )
+    params = [user_id]
 
-            membership = cur.fetchone()
+    if building_id is not None:
+        query += " AND b.building_id = %s"
+        params.append(building_id)
 
-    if membership is None:
+    if require_admin:
+        query += " AND bm.role = 'admin'"
+
+    query += " ORDER BY b.building_id LIMIT 1"
+
+    cur.execute(query, tuple(params))
+    building = cur.fetchone()
+
+    if building is None:
         raise HTTPException(
             status_code=403,
-            detail="You do not have access to this building"
+            detail="You do not have approved access to this building or permission to update its settings"
         )
 
-    return membership[0]
+    return building
 
 
-# Legacy endpoints are disabled to prevent bypassing building permissions.
-# The frontend must use the building-specific endpoints instead.
-
-@control_router.get(
-    "/control-settings",
-    response_model=ControlSettings,
-    include_in_schema=False
-)
-def get_control_settings():
-    raise HTTPException(
-        status_code=410,
-        detail="Use /buildings/{building_id}/control-settings instead"
-    )
-
-
-@control_router.put(
-    "/control-settings",
-    response_model=ControlSettings,
-    include_in_schema=False
-)
-def update_control_settings(payload: ControlSettings):
-    raise HTTPException(
-        status_code=410,
-        detail="Use /buildings/{building_id}/control-settings instead"
-    )
-
-
-# Get settings for a building the user belongs to.
-
-@control_router.get(
-    "/buildings/{building_id}/control-settings",
-    response_model=ControlSettings
-)
-def get_building_control_settings(
-    building_id: int,
+@control_router.get("/control-settings", response_model=ControlSettings)
+def get_control_settings(
+    building_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
-    # Check that the user belongs to this building.
-    check_building_access(building_id, current_user)
-
     with get_control_connection() as conn:
         with conn.cursor() as cur:
+            building = get_user_building(
+                cur, current_user["user_id"], building_id
+            )
+
             cur.execute(
                 """
-                SELECT temperature_threshold,
-                       humidity_threshold,
-                       light_enabled,
-                       updated_at
+                SELECT temperature_threshold, humidity_threshold,
+                       light_enabled, updated_at
                 FROM control_settings
                 WHERE building_id = %s
                 """,
-                (building_id,)
+                (building[0],)
             )
 
             row = cur.fetchone()
 
-    if row is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No control settings found for this building"
-        )
+            if row is None:
+                cur.execute(
+                    """
+                    INSERT INTO control_settings (
+                        temperature_threshold,
+                        humidity_threshold,
+                        light_enabled,
+                        building_id
+                    )
+                    VALUES (25, 70, TRUE, %s)
+                    RETURNING temperature_threshold, humidity_threshold,
+                              light_enabled, updated_at
+                    """,
+                    (building[0],)
+                )
+                row = cur.fetchone()
+                conn.commit()
 
     return ControlSettings(
         temperature_threshold=row[0],
@@ -108,36 +89,28 @@ def get_building_control_settings(
     )
 
 
-# Update settings for a building.
-# Only approved building admins can make changes.
-
-@control_router.put(
-    "/buildings/{building_id}/control-settings",
-    response_model=ControlSettings
-)
-def update_building_control_settings(
-    building_id: int,
+@control_router.put("/control-settings", response_model=ControlSettings)
+def update_control_settings(
     payload: ControlSettings,
+    building_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
-    # Check the user's role in this building.
-    role = check_building_access(building_id, current_user)
-
-    if role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only building admins can update control settings"
-        )
-
     with get_control_connection() as conn:
         with conn.cursor() as cur:
+            building = get_user_building(
+                cur,
+                current_user["user_id"],
+                building_id,
+                require_admin=True
+            )
+
             cur.execute(
                 """
                 INSERT INTO control_settings (
-                    building_id,
                     temperature_threshold,
                     humidity_threshold,
                     light_enabled,
+                    building_id,
                     updated_at
                 )
                 VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
@@ -148,18 +121,15 @@ def update_building_control_settings(
                     humidity_threshold = EXCLUDED.humidity_threshold,
                     light_enabled = EXCLUDED.light_enabled,
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING
-                    temperature_threshold,
-                    humidity_threshold,
-                    light_enabled,
-                    updated_at
+                RETURNING temperature_threshold, humidity_threshold,
+                          light_enabled, updated_at
                 """,
                 (
-                    building_id,
                     payload.temperature_threshold,
                     payload.humidity_threshold,
                     payload.light_enabled,
-                )
+                    building[0],
+                ),
             )
 
             row = cur.fetchone()
@@ -171,33 +141,3 @@ def update_building_control_settings(
         light_enabled=row[2],
         updated_at=row[3].isoformat() if row[3] else None,
     )
-
-# List buildings the logged-in user has approved access to.
-@control_router.get("/buildings")
-def list_my_buildings(
-    current_user: dict = Depends(get_current_user)
-):
-    with get_auth_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT b.building_id, b.building_name, bm.role
-                FROM buildings b
-                JOIN building_members bm
-                    ON b.building_id = bm.building_id
-                WHERE bm.user_id = %s
-                  AND bm.status = 'approved'
-                ORDER BY b.building_name
-                """,
-                (current_user["user_id"],)
-            )
-            rows = cur.fetchall()
-
-    return [
-        {
-            "building_id": row[0],
-            "building_name": row[1],
-            "role": row[2]
-        }
-        for row in rows
-    ]

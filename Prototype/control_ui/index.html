@@ -685,44 +685,122 @@
             background: white;
             cursor: pointer;
         }
+            .auth-switch {
+        background: none;
+        border: none;
+        color: #3563ff;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: inherit;
+        padding: 4px;
+    }
+
+    .auth-switch:hover {
+        text-decoration: underline;
+    }
     </style>
 </head>
 
 <body>
-    <div id="login-screen" class="login-screen">
+   <div id="login-screen" class="login-screen">
     <div class="login-card">
-        <div class="brand-icon">⌘</div>
+        <div class="brand-icon">IoT</div>
 
         <h1>IoT Control Centre</h1>
-        <p>Sign in to access your control dashboard.</p>
 
-        <form id="login-form">
-            <div class="field">
-                <label for="login-email">Email address</label>
-                <input
-                    type="email"
-                    id="login-email"
-                    placeholder="Enter your email"
-                    required
-                >
-            </div>
+        <!-- Sign In Form -->
+        <div id="login-section">
+            <p>Sign in to access your control dashboard.</p>
 
-            <div class="field">
-                <label for="login-password">Password</label>
-                <input
-                    type="password"
-                    id="login-password"
-                    placeholder="Enter your password"
-                    required
-                >
-            </div>
+            <form id="login-form">
+                <div class="field">
+                    <label for="login-email">Email address</label>
+                    <input
+                        type="email"
+                        id="login-email"
+                        placeholder="Enter your email"
+                        required
+                    >
+                </div>
 
-            <button type="submit" class="save-button" id="login-button">
-                Sign In
-            </button>
+                <div class="field">
+                    <label for="login-password">Password</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
 
-            <p id="login-status" role="status" aria-live="polite"></p>
-        </form>
+                <button type="submit" class="save-button" id="login-button">
+                    Sign In
+                </button>
+
+                <p id="login-status" role="status" aria-live="polite"></p>
+            </form>
+
+            <p>
+                New user?
+                <button type="button" id="show-register" class="auth-switch">
+                    Create an account
+                </button>
+            </p>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="register-section" hidden>
+            <p>Create an account to access the control dashboard.</p>
+
+            <form id="register-form">
+                <div class="field">
+                    <label for="register-name">Full name</label>
+                    <input
+                        type="text"
+                        id="register-name"
+                        placeholder="Enter your full name"
+                        minlength="2"
+                        maxlength="100"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="register-email">Email address</label>
+                    <input
+                        type="email"
+                        id="register-email"
+                        placeholder="Enter your email"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="register-password">Password</label>
+                    <input
+                        type="password"
+                        id="register-password"
+                        placeholder="At least 8 characters"
+                        minlength="8"
+                        maxlength="128"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="save-button" id="register-button">
+                    Create Account
+                </button>
+
+                <p id="register-status" role="status" aria-live="polite"></p>
+            </form>
+
+            <p>
+                Already have an account?
+                <button type="button" id="show-login" class="auth-switch">
+                    Sign In
+                </button>
+            </p>
+        </div>
     </div>
 </div>
 <div class="layout" id="dashboard" hidden>
@@ -768,6 +846,15 @@
 </div>
 
         </header>
+        <div class="card" style="margin-bottom:22px; padding:18px 24px;">
+            <label for="building-select" style="font-weight:bold; display:block; margin-bottom:10px;">
+                Current Building
+            </label>
+            <select id="building-select"
+                style="width:100%; max-width:400px; padding:12px; border:1px solid #dce2ed; border-radius:9px;">
+                <option value="">Loading buildings...</option>
+            </select>
+        </div>
 
         <div class="dashboard">
             <section class="card">
@@ -1011,54 +1098,30 @@ const loginPassword = document.getElementById("login-password");
 const loginStatus = document.getElementById("login-status");
 const loginButton = document.getElementById("login-button");
 const logoutButton = document.getElementById("logout-button");
+const loginSection = document.getElementById("login-section");
+const registerSection = document.getElementById("register-section");
+
+const registerForm = document.getElementById("register-form");
+const registerName = document.getElementById("register-name");
+const registerEmail = document.getElementById("register-email");
+const registerPassword = document.getElementById("register-password");
+const registerStatus = document.getElementById("register-status");
+const registerButton = document.getElementById("register-button");
+
+const showRegisterButton = document.getElementById("show-register");
+const showLoginButton = document.getElementById("show-login");
 
 const currentUserName = document.getElementById("current-user-name");
 const currentUserEmail = document.getElementById("current-user-email");
 
 const API_BASE_URL = "http://127.0.0.1:8000";
+const API_URL = API_BASE_URL + "/control-settings";
+const buildingSelect = document.getElementById("building-select");
 let selectedBuildingId = null;
-
-
-const buildingSelector = document.createElement("select");
-buildingSelector.id = "building-selector";
-buildingSelector.style.cssText = "padding:10px;margin:12px 0;border-radius:8px;max-width:350px;width:100%";
-
-const buildingLabel = document.createElement("label");
-buildingLabel.textContent = "Select Building";
-buildingLabel.htmlFor = "building-selector";
-buildingLabel.style.cssText = "display:block;font-weight:bold;margin-top:15px";
-
-dashboard.prepend(buildingSelector);
-dashboard.prepend(buildingLabel);
-
-async function loadBuildings() {
-    const response = await authenticatedFetch(API_BASE_URL + "/buildings");
-    if (!response.ok) throw new Error("Could not load buildings.");
-
-    const buildings = await response.json();
-    buildingSelector.replaceChildren();
-
-    for (const building of buildings) {
-        const option = document.createElement("option");
-        option.value = building.building_id;
-        option.textContent = building.building_name;
-        buildingSelector.appendChild(option);
-    }
-
-    selectedBuildingId = buildings.length ? buildings[0].building_id : null;
-    buildingSelector.disabled = !selectedBuildingId;
-    return buildings;
-}
-
-buildingSelector.addEventListener("change", async () => {
-    selectedBuildingId = Number(buildingSelector.value);
-    await loadSettings();
-});
 
 let token = sessionStorage.getItem("access_token");
 
 function showLogin(message = "", type = "") {
-    selectedBuildingId = null;
     token = null;
     sessionStorage.removeItem("access_token");
 
@@ -1174,6 +1237,101 @@ logoutButton.addEventListener("click", function () {
     showLogin("You have been logged out successfully.", "success");
 });
 
+// Switch between login and registration
+showRegisterButton.addEventListener("click", function () {
+    loginSection.hidden = true;
+    registerSection.hidden = false;
+
+    loginStatus.textContent = "";
+    registerStatus.textContent = "";
+});
+
+showLoginButton.addEventListener("click", function () {
+    registerSection.hidden = true;
+    loginSection.hidden = false;
+
+    registerStatus.textContent = "";
+    loginStatus.textContent = "";
+});
+
+// Register a new user
+registerForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    registerButton.disabled = true;
+    registerButton.textContent = "Creating account...";
+    registerStatus.textContent = "";
+
+    try {
+        const response = await fetch(API_BASE_URL + "/auth/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                full_name: registerName.value.trim(),
+                email: registerEmail.value.trim(),
+                password: registerPassword.value
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Registration failed.");
+        }
+
+        registerForm.reset();
+
+        registerSection.hidden = true;
+        loginSection.hidden = false;
+
+        loginEmail.value = data.user.email;
+
+        loginStatus.textContent =
+            "Account created successfully! You can now sign in.";
+
+        loginStatus.className = "success";
+
+    } catch (error) {
+        registerStatus.textContent = error.message;
+        registerStatus.className = "error";
+
+    } finally {
+        registerButton.disabled = false;
+        registerButton.textContent = "Create Account";
+    }
+});
+
+// Load buildings available to the logged-in user
+async function loadBuildings() {
+    const response = await authenticatedFetch(
+        API_BASE_URL + "/buildings/"
+    );
+
+    if (!response.ok) {
+        throw new Error("Could not load your buildings.");
+    }
+
+    const data = await response.json();
+
+    buildingSelect.innerHTML = "";
+
+    if (!data.buildings || data.buildings.length === 0) {
+        throw new Error("No approved buildings found.");
+    }
+
+    data.buildings.forEach(function (building) {
+        const option = document.createElement("option");
+        option.value = building.building_id;
+        option.textContent = building.building_name;
+        buildingSelect.appendChild(option);
+    });
+
+    selectedBuildingId = data.buildings[0].building_id;
+    buildingSelect.value = selectedBuildingId;
+}
+
 // Display settings returned by the API
 function displaySettings(settings) {
     temperatureInput.value = settings.temperature_threshold;
@@ -1205,16 +1363,14 @@ function displaySettings(settings) {
 
 // Load settings using the JWT token
 async function loadSettings() {
-    if (!selectedBuildingId) {
-        showStatus("No approved buildings available.", "error");
-        return;
-    }
     showStatus("Loading saved settings...");
     updatedAt.textContent = "Loading...";
     setConnection(false);
 
     try {
-        const response = await authenticatedFetch(API_BASE_URL + "/buildings/" + selectedBuildingId + "/control-settings");
+        const response = await authenticatedFetch(
+            API_URL + "?building_id=" + selectedBuildingId
+        );
 
         if (!response.ok) {
             throw new Error("Could not load settings.");
@@ -1286,7 +1442,9 @@ form.addEventListener("submit", async function (event) {
     showStatus("Saving settings...");
 
     try {
-        const response = await authenticatedFetch(API_BASE_URL + "/buildings/" + selectedBuildingId + "/control-settings", {
+        const response = await authenticatedFetch(
+            API_URL + "?building_id=" + selectedBuildingId,
+            {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json"
@@ -1352,6 +1510,12 @@ async function checkSession() {
         }
     }
 }
+
+// Switch between approved buildings
+buildingSelect.addEventListener("change", async function () {
+    selectedBuildingId = Number(buildingSelect.value);
+    await loadSettings();
+});
 
 checkSession();
 </script>
