@@ -171,3 +171,33 @@ def update_building_control_settings(
         light_enabled=row[2],
         updated_at=row[3].isoformat() if row[3] else None,
     )
+
+# List buildings the logged-in user has approved access to.
+@control_router.get("/buildings")
+def list_my_buildings(
+    current_user: dict = Depends(get_current_user)
+):
+    with get_auth_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT b.building_id, b.building_name, bm.role
+                FROM buildings b
+                JOIN building_members bm
+                    ON b.building_id = bm.building_id
+                WHERE bm.user_id = %s
+                  AND bm.status = 'approved'
+                ORDER BY b.building_name
+                """,
+                (current_user["user_id"],)
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "building_id": row[0],
+            "building_name": row[1],
+            "role": row[2]
+        }
+        for row in rows
+    ]

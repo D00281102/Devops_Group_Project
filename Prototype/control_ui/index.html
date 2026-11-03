@@ -1016,11 +1016,49 @@ const currentUserName = document.getElementById("current-user-name");
 const currentUserEmail = document.getElementById("current-user-email");
 
 const API_BASE_URL = "http://127.0.0.1:8000";
-const API_URL = API_BASE_URL + "/control-settings";
+let selectedBuildingId = null;
+
+
+const buildingSelector = document.createElement("select");
+buildingSelector.id = "building-selector";
+buildingSelector.style.cssText = "padding:10px;margin:12px 0;border-radius:8px;max-width:350px;width:100%";
+
+const buildingLabel = document.createElement("label");
+buildingLabel.textContent = "Select Building";
+buildingLabel.htmlFor = "building-selector";
+buildingLabel.style.cssText = "display:block;font-weight:bold;margin-top:15px";
+
+dashboard.prepend(buildingSelector);
+dashboard.prepend(buildingLabel);
+
+async function loadBuildings() {
+    const response = await authenticatedFetch(API_BASE_URL + "/buildings");
+    if (!response.ok) throw new Error("Could not load buildings.");
+
+    const buildings = await response.json();
+    buildingSelector.replaceChildren();
+
+    for (const building of buildings) {
+        const option = document.createElement("option");
+        option.value = building.building_id;
+        option.textContent = building.building_name;
+        buildingSelector.appendChild(option);
+    }
+
+    selectedBuildingId = buildings.length ? buildings[0].building_id : null;
+    buildingSelector.disabled = !selectedBuildingId;
+    return buildings;
+}
+
+buildingSelector.addEventListener("change", async () => {
+    selectedBuildingId = Number(buildingSelector.value);
+    await loadSettings();
+});
 
 let token = sessionStorage.getItem("access_token");
 
 function showLogin(message = "", type = "") {
+    selectedBuildingId = null;
     token = null;
     sessionStorage.removeItem("access_token");
 
@@ -1115,6 +1153,7 @@ loginForm.addEventListener("submit", async function (event) {
         showDashboard(userData.user);
         loginForm.reset();
 
+        await loadBuildings();
         await loadSettings();
 
     } catch (error) {
@@ -1166,12 +1205,16 @@ function displaySettings(settings) {
 
 // Load settings using the JWT token
 async function loadSettings() {
+    if (!selectedBuildingId) {
+        showStatus("No approved buildings available.", "error");
+        return;
+    }
     showStatus("Loading saved settings...");
     updatedAt.textContent = "Loading...";
     setConnection(false);
 
     try {
-        const response = await authenticatedFetch(API_URL);
+        const response = await authenticatedFetch(API_BASE_URL + "/buildings/" + selectedBuildingId + "/control-settings");
 
         if (!response.ok) {
             throw new Error("Could not load settings.");
@@ -1243,7 +1286,7 @@ form.addEventListener("submit", async function (event) {
     showStatus("Saving settings...");
 
     try {
-        const response = await authenticatedFetch(API_URL, {
+        const response = await authenticatedFetch(API_BASE_URL + "/buildings/" + selectedBuildingId + "/control-settings", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json"
@@ -1300,6 +1343,7 @@ async function checkSession() {
         const userData = await response.json();
 
         showDashboard(userData.user);
+        await loadBuildings();
         await loadSettings();
 
     } catch (error) {
