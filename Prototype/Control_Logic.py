@@ -1,4 +1,4 @@
-import json
+﻿import json
 import paho.mqtt.client as mqtt
 from api.db import get_connection, pool
 from api.control_db import get_control_connection
@@ -8,35 +8,84 @@ import os
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
-ACTUATOR_TOPIC = "actuators/commands"
 
-def get_control_settings():
+
+
+def get_building_id(device_id):
     """
-    Retrieve the saved control settings from PostgreSQL.
+    Find which building a sensor device belongs to.
     """
+    if not device_id:
+        return None
+
     with get_control_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT temperature_threshold, humidity_threshold, light_enabled
-                FROM control_settings
-                WHERE id = 1
-                """
+                SELECT building_id
+                FROM building_devices
+                WHERE device_id = %s
+                """,
+                (device_id,)
             )
             row = cur.fetchone()
 
+    # Return None if the device isn't registered.
     if row is None:
+        return None
+
+    return row[0]
+
+
+
+def get_control_settings(building_id=None):
+    """
+    Retrieve control settings for a specific building from PostgreSQL.
+    """
+    with get_control_connection() as conn:
+        with conn.cursor() as cur:
+            if building_id is None:
+                # Use the original single-building settings.
+                cur.execute(
+                    """
+                    SELECT temperature_threshold, humidity_threshold, light_enabled
+                    FROM control_settings
+                    WHERE id = 1
+                    """
+                )
+            else:
+                # Get settings for the selected building.
+                cur.execute(
+                    """
+                    SELECT temperature_threshold, humidity_threshold, light_enabled
+                    FROM control_settings
+                    WHERE building_id = %s
+                    """,
+                    (building_id,)
+                )
+
+            row = cur.fetchone()
+
+
+    if row is None:
+        # Don't control a building without saved settings.
+        if building_id is not None:
+            return None
+
+        # Keep the original single-building defaults.
         return {
             "temperature_threshold": 25,
             "humidity_threshold": 70,
             "light_enabled": True
         }
 
+
     return {
         "temperature_threshold": row[0],
         "humidity_threshold": row[1],
         "light_enabled": row[2]
     }
+
 
 def get_latest_sensor_data():
     """
@@ -86,7 +135,21 @@ def process_database_data(client):
     print("Latest database sensor reading:")
     print(json.dumps(sensor_data, indent=4))
 
-    settings = get_control_settings()
+
+    # Find which building this sensor belongs to.
+    building_id = get_building_id(sensor_data.get("device"))
+
+    if building_id is None:
+        print("Unknown sensor device. Skipping control decisions.")
+        return
+
+    # Use the settings for this building.
+    settings = get_control_settings(building_id)
+
+    if settings is None:
+        print(f"No control settings found for Building {building_id}. Skipping.")
+        return
+
     commands = evaluate_sensor_data(sensor_data, settings)
 
     if commands:
@@ -98,7 +161,7 @@ def process_database_data(client):
                 f"{command['action']} - {command['reason']}"
             )
 
-            publish_actuator_command(client, command)
+            publish_actuator_command(client, command, building_id)
     else:
         print("Control decision: No action required")
 
@@ -108,7 +171,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     """
     if reason_code == 0:
         print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+        print("Actuator commands will be published to building-specific MQTT topics.")
 
         client.subscribe(SENSOR_TOPIC)
         print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
@@ -151,20 +214,20 @@ def evaluate_sensor_data(sensor_data, settings=None):
 
     return commands
 
-def publish_actuator_command(client, command):
+def publish_actuator_command(client, command, building_id):
     """
-    Publish an actuator command to the MQTT broker.
+    Publish an actuator command to the correct building.
     """
-    payload = json.dumps(command)
+    topic = f"buildings/{building_id}/actuators/commands"
 
-    client.publish(
-        ACTUATOR_TOPIC,
-        payload
-    )
+    # Include the building ID so the receiver can verify it.
+    payload_data = {**command, "building_id": building_id}
+    payload = json.dumps(payload_data)
 
-    print(f"Published actuator command to: {ACTUATOR_TOPIC}")
-    print(json.dumps(command, indent=4))
+    client.publish(topic, payload)
 
+    print(f"Published actuator command to: {topic}")
+    print(json.dumps(payload_data, indent=4))
 
 def on_message(client, userdata, message):
     """
@@ -176,7 +239,21 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-        settings = get_control_settings()
+
+        # Find which building sent this sensor reading.
+        building_id = get_building_id(sensor_data.get("device"))
+
+        if building_id is None:
+            print("Unknown sensor device. Skipping control decisions.")
+            return
+
+        # Apply the settings for this building.
+        settings = get_control_settings(building_id)
+
+        if settings is None:
+            print(f"No control settings found for Building {building_id}. Skipping.")
+            return
+
         commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
@@ -188,7 +265,7 @@ def on_message(client, userdata, message):
                     f"{command['action']} - {command['reason']}"
                 )
 
-                publish_actuator_command(client, command)
+                publish_actuator_command(client, command, building_id)
 
         else:
             print("Control decision: No action required")

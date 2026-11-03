@@ -5,7 +5,9 @@ import os
 # MQTT configuration
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-ACTUATOR_TOPIC = "actuators/commands"
+# Each simulator listens for commands for its own building.
+BUILDING_ID = int(os.getenv("BUILDING_ID", "1"))
+ACTUATOR_TOPIC = f"buildings/{BUILDING_ID}/actuators/commands"
 
 
 def on_connect(client, userdata, flags, reason_code, properties):
@@ -52,6 +54,12 @@ def on_message(client, userdata, message):
     """
     try:
         command = json.loads(message.payload.decode("utf-8"))
+
+        # Ignore commands that belong to another building.
+        if command.get("building_id") != BUILDING_ID:
+            print(f"Ignoring command for another building: {command.get('building_id')}")
+            return
+
         simulate_actuator(command)
 
     except json.JSONDecodeError:
