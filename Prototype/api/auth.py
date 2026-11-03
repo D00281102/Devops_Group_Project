@@ -121,7 +121,8 @@ def get_current_user(
     }
 
 
-# Register a new user
+
+# Register a new user and create their building
 @router.post("/register", status_code=201)
 def register_user(user: RegisterRequest):
 
@@ -131,6 +132,8 @@ def register_user(user: RegisterRequest):
     try:
         with get_auth_connection() as conn:
             with conn.cursor() as cur:
+
+                # Create the user account
                 cur.execute(
                     """
                     INSERT INTO users (full_name, email, password_hash)
@@ -141,23 +144,53 @@ def register_user(user: RegisterRequest):
                 )
 
                 new_user = cur.fetchone()
+                user_id = new_user[0]
+
+                # Create a building for the new user
+                building_name = user.full_name.strip() + "'s Building"
+
+                cur.execute(
+                    """
+                    INSERT INTO buildings
+                        (building_name, building_code, created_by)
+                    VALUES (%s, %s, %s)
+                    RETURNING building_id, building_name, building_code
+                    """,
+                    (building_name, "BLD-" + str(user_id), user_id)
+                )
+
+                building = cur.fetchone()
+
+                # Make the new user an approved building admin
+                cur.execute(
+                    """
+                    INSERT INTO building_members
+                        (user_id, building_id, role, status)
+                    VALUES (%s, %s, 'admin', 'approved')
+                    """,
+                    (user_id, building[0])
+                )
 
     except psycopg.errors.UniqueViolation:
         raise HTTPException(
             status_code=409,
-            detail="Email address is already registered"
+            detail="Email address or building code is already registered"
         )
 
     return {
-        "message": "User registered successfully",
+        "message": "Account and building created successfully",
         "user": {
             "user_id": new_user[0],
             "full_name": new_user[1],
             "email": new_user[2],
             "created_at": new_user[3]
+        },
+        "building": {
+            "building_id": building[0],
+            "building_name": building[1],
+            "building_code": building[2]
         }
     }
-
 
 # Log in an existing user
 @router.post("/login")

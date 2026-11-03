@@ -685,44 +685,122 @@
             background: white;
             cursor: pointer;
         }
+            .auth-switch {
+        background: none;
+        border: none;
+        color: #3563ff;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: inherit;
+        padding: 4px;
+    }
+
+    .auth-switch:hover {
+        text-decoration: underline;
+    }
     </style>
 </head>
 
 <body>
-    <div id="login-screen" class="login-screen">
+   <div id="login-screen" class="login-screen">
     <div class="login-card">
-        <div class="brand-icon">⌘</div>
+        <div class="brand-icon">IoT</div>
 
         <h1>IoT Control Centre</h1>
-        <p>Sign in to access your control dashboard.</p>
 
-        <form id="login-form">
-            <div class="field">
-                <label for="login-email">Email address</label>
-                <input
-                    type="email"
-                    id="login-email"
-                    placeholder="Enter your email"
-                    required
-                >
-            </div>
+        <!-- Sign In Form -->
+        <div id="login-section">
+            <p>Sign in to access your control dashboard.</p>
 
-            <div class="field">
-                <label for="login-password">Password</label>
-                <input
-                    type="password"
-                    id="login-password"
-                    placeholder="Enter your password"
-                    required
-                >
-            </div>
+            <form id="login-form">
+                <div class="field">
+                    <label for="login-email">Email address</label>
+                    <input
+                        type="email"
+                        id="login-email"
+                        placeholder="Enter your email"
+                        required
+                    >
+                </div>
 
-            <button type="submit" class="save-button" id="login-button">
-                Sign In
-            </button>
+                <div class="field">
+                    <label for="login-password">Password</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
 
-            <p id="login-status" role="status" aria-live="polite"></p>
-        </form>
+                <button type="submit" class="save-button" id="login-button">
+                    Sign In
+                </button>
+
+                <p id="login-status" role="status" aria-live="polite"></p>
+            </form>
+
+            <p>
+                New user?
+                <button type="button" id="show-register" class="auth-switch">
+                    Create an account
+                </button>
+            </p>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="register-section" hidden>
+            <p>Create an account to access the control dashboard.</p>
+
+            <form id="register-form">
+                <div class="field">
+                    <label for="register-name">Full name</label>
+                    <input
+                        type="text"
+                        id="register-name"
+                        placeholder="Enter your full name"
+                        minlength="2"
+                        maxlength="100"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="register-email">Email address</label>
+                    <input
+                        type="email"
+                        id="register-email"
+                        placeholder="Enter your email"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="register-password">Password</label>
+                    <input
+                        type="password"
+                        id="register-password"
+                        placeholder="At least 8 characters"
+                        minlength="8"
+                        maxlength="128"
+                        required
+                    >
+                </div>
+
+                <button type="submit" class="save-button" id="register-button">
+                    Create Account
+                </button>
+
+                <p id="register-status" role="status" aria-live="polite"></p>
+            </form>
+
+            <p>
+                Already have an account?
+                <button type="button" id="show-login" class="auth-switch">
+                    Sign In
+                </button>
+            </p>
+        </div>
     </div>
 </div>
 <div class="layout" id="dashboard" hidden>
@@ -1011,6 +1089,18 @@ const loginPassword = document.getElementById("login-password");
 const loginStatus = document.getElementById("login-status");
 const loginButton = document.getElementById("login-button");
 const logoutButton = document.getElementById("logout-button");
+const loginSection = document.getElementById("login-section");
+const registerSection = document.getElementById("register-section");
+
+const registerForm = document.getElementById("register-form");
+const registerName = document.getElementById("register-name");
+const registerEmail = document.getElementById("register-email");
+const registerPassword = document.getElementById("register-password");
+const registerStatus = document.getElementById("register-status");
+const registerButton = document.getElementById("register-button");
+
+const showRegisterButton = document.getElementById("show-register");
+const showLoginButton = document.getElementById("show-login");
 
 const currentUserName = document.getElementById("current-user-name");
 const currentUserEmail = document.getElementById("current-user-email");
@@ -1133,6 +1223,72 @@ loginForm.addEventListener("submit", async function (event) {
 // Logout
 logoutButton.addEventListener("click", function () {
     showLogin("You have been logged out successfully.", "success");
+});
+
+// Switch between login and registration
+showRegisterButton.addEventListener("click", function () {
+    loginSection.hidden = true;
+    registerSection.hidden = false;
+
+    loginStatus.textContent = "";
+    registerStatus.textContent = "";
+});
+
+showLoginButton.addEventListener("click", function () {
+    registerSection.hidden = true;
+    loginSection.hidden = false;
+
+    registerStatus.textContent = "";
+    loginStatus.textContent = "";
+});
+
+// Register a new user
+registerForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    registerButton.disabled = true;
+    registerButton.textContent = "Creating account...";
+    registerStatus.textContent = "";
+
+    try {
+        const response = await fetch(API_BASE_URL + "/auth/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                full_name: registerName.value.trim(),
+                email: registerEmail.value.trim(),
+                password: registerPassword.value
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Registration failed.");
+        }
+
+        registerForm.reset();
+
+        registerSection.hidden = true;
+        loginSection.hidden = false;
+
+        loginEmail.value = data.user.email;
+
+        loginStatus.textContent =
+            "Account created successfully! You can now sign in.";
+
+        loginStatus.className = "success";
+
+    } catch (error) {
+        registerStatus.textContent = error.message;
+        registerStatus.className = "error";
+
+    } finally {
+        registerButton.disabled = false;
+        registerButton.textContent = "Create Account";
+    }
 });
 
 // Display settings returned by the API

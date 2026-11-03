@@ -136,10 +136,10 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
       CONTROL_DB_HOST: host.docker.internal
-      CONTROL_DB_PORT: "${CONTROL_DB_PORT:-5432}"
-      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
-      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
+      CONTROL_DB_PORT: "${AUTH_DB_PORT:-5436}"
+      CONTROL_DB_NAME: ${AUTH_DB_NAME:-scrum108_test_db}
+      CONTROL_DB_USER: ${AUTH_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
 
       AUTH_DB_HOST: ${AUTH_DB_HOST:?Set AUTH_DB_HOST in your local .env file}
       AUTH_DB_PORT: ${AUTH_DB_PORT:-5436}
