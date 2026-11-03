@@ -846,6 +846,15 @@
 </div>
 
         </header>
+        <div class="card" style="margin-bottom:22px; padding:18px 24px;">
+            <label for="building-select" style="font-weight:bold; display:block; margin-bottom:10px;">
+                Current Building
+            </label>
+            <select id="building-select"
+                style="width:100%; max-width:400px; padding:12px; border:1px solid #dce2ed; border-radius:9px;">
+                <option value="">Loading buildings...</option>
+            </select>
+        </div>
 
         <div class="dashboard">
             <section class="card">
@@ -1107,6 +1116,8 @@ const currentUserEmail = document.getElementById("current-user-email");
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 const API_URL = API_BASE_URL + "/control-settings";
+const buildingSelect = document.getElementById("building-select");
+let selectedBuildingId = null;
 
 let token = sessionStorage.getItem("access_token");
 
@@ -1205,6 +1216,7 @@ loginForm.addEventListener("submit", async function (event) {
         showDashboard(userData.user);
         loginForm.reset();
 
+        await loadBuildings();
         await loadSettings();
 
     } catch (error) {
@@ -1291,6 +1303,35 @@ registerForm.addEventListener("submit", async function (event) {
     }
 });
 
+// Load buildings available to the logged-in user
+async function loadBuildings() {
+    const response = await authenticatedFetch(
+        API_BASE_URL + "/buildings/"
+    );
+
+    if (!response.ok) {
+        throw new Error("Could not load your buildings.");
+    }
+
+    const data = await response.json();
+
+    buildingSelect.innerHTML = "";
+
+    if (!data.buildings || data.buildings.length === 0) {
+        throw new Error("No approved buildings found.");
+    }
+
+    data.buildings.forEach(function (building) {
+        const option = document.createElement("option");
+        option.value = building.building_id;
+        option.textContent = building.building_name;
+        buildingSelect.appendChild(option);
+    });
+
+    selectedBuildingId = data.buildings[0].building_id;
+    buildingSelect.value = selectedBuildingId;
+}
+
 // Display settings returned by the API
 function displaySettings(settings) {
     temperatureInput.value = settings.temperature_threshold;
@@ -1327,7 +1368,9 @@ async function loadSettings() {
     setConnection(false);
 
     try {
-        const response = await authenticatedFetch(API_URL);
+        const response = await authenticatedFetch(
+            API_URL + "?building_id=" + selectedBuildingId
+        );
 
         if (!response.ok) {
             throw new Error("Could not load settings.");
@@ -1399,7 +1442,9 @@ form.addEventListener("submit", async function (event) {
     showStatus("Saving settings...");
 
     try {
-        const response = await authenticatedFetch(API_URL, {
+        const response = await authenticatedFetch(
+            API_URL + "?building_id=" + selectedBuildingId,
+            {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json"
@@ -1456,6 +1501,7 @@ async function checkSession() {
         const userData = await response.json();
 
         showDashboard(userData.user);
+        await loadBuildings();
         await loadSettings();
 
     } catch (error) {
@@ -1464,6 +1510,12 @@ async function checkSession() {
         }
     }
 }
+
+// Switch between approved buildings
+buildingSelect.addEventListener("change", async function () {
+    selectedBuildingId = Number(buildingSelect.value);
+    await loadSettings();
+});
 
 checkSession();
 </script>

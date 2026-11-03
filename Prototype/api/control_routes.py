@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.control_db import get_control_connection
 from api.models import ControlSettings
@@ -8,28 +8,33 @@ from api.auth import get_current_user
 control_router = APIRouter(tags=["control-settings"])
 
 
-def get_user_building(cur, user_id):
-    cur.execute(
-        """
-        SELECT b.building_id, b.building_name
+def get_user_building(cur, user_id, building_id=None, require_admin=False):
+    query = """
+        SELECT b.building_id, b.building_name, bm.role
         FROM buildings b
         JOIN building_members bm
             ON b.building_id = bm.building_id
         WHERE bm.user_id = %s
           AND bm.status = 'approved'
-          AND bm.role = 'admin'
-        ORDER BY b.building_id
-        LIMIT 1
-        """,
-        (user_id,)
-    )
+    """
+    params = [user_id]
 
+    if building_id is not None:
+        query += " AND b.building_id = %s"
+        params.append(building_id)
+
+    if require_admin:
+        query += " AND bm.role = 'admin'"
+
+    query += " ORDER BY b.building_id LIMIT 1"
+
+    cur.execute(query, tuple(params))
     building = cur.fetchone()
 
     if building is None:
         raise HTTPException(
             status_code=403,
-            detail="No approved building administrator access found"
+            detail="You do not have approved access to this building or permission to update its settings"
         )
 
     return building
@@ -37,15 +42,14 @@ def get_user_building(cur, user_id):
 
 @control_router.get("/control-settings", response_model=ControlSettings)
 def get_control_settings(
+    building_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
     with get_control_connection() as conn:
         with conn.cursor() as cur:
             building = get_user_building(
-                cur, current_user["user_id"]
+                cur, current_user["user_id"], building_id
             )
-
-            building_id = building[0]
 
             cur.execute(
                 """
@@ -54,7 +58,7 @@ def get_control_settings(
                 FROM control_settings
                 WHERE building_id = %s
                 """,
-                (building_id,)
+                (building[0],)
             )
 
             row = cur.fetchone()
@@ -72,7 +76,7 @@ def get_control_settings(
                     RETURNING temperature_threshold, humidity_threshold,
                               light_enabled, updated_at
                     """,
-                    (building_id,)
+                    (building[0],)
                 )
                 row = cur.fetchone()
                 conn.commit()
@@ -88,15 +92,17 @@ def get_control_settings(
 @control_router.put("/control-settings", response_model=ControlSettings)
 def update_control_settings(
     payload: ControlSettings,
+    building_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user)
 ):
     with get_control_connection() as conn:
         with conn.cursor() as cur:
             building = get_user_building(
-                cur, current_user["user_id"]
+                cur,
+                current_user["user_id"],
+                building_id,
+                require_admin=True
             )
-
-            building_id = building[0]
 
             cur.execute(
                 """
@@ -122,7 +128,7 @@ def update_control_settings(
                     payload.temperature_threshold,
                     payload.humidity_threshold,
                     payload.light_enabled,
-                    building_id,
+                    building[0],
                 ),
             )
 
