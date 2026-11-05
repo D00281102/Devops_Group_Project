@@ -65,3 +65,6 @@ class ControlSettings(BaseModel):
     )
     light_enabled: bool = True
     updated_at: Optional[str] = None
+ 
+class BuildingCreate(BaseModel): 
+    building_name: str = Field(min_length=1, max_length=150)
