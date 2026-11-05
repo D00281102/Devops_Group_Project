@@ -68,3 +68,6 @@ class ControlSettings(BaseModel):
  
 class BuildingCreate(BaseModel): 
     building_name: str = Field(min_length=1, max_length=150)
+
+class BuildingJoin(BaseModel):
+    building_code: str = Field(min_length=1, max_length=64)   
