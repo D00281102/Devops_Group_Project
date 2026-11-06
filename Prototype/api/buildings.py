@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from uuid import uuid4
-from api.models import BuildingCreate
+from api.models import BuildingCreate, BuildingJoin
 from api.auth import get_current_user
 from api.auth_db import get_auth_connection
 
@@ -90,4 +90,57 @@ def create_building(
             "building_code": building[2],
             "role": "admin"
         }
+    }
+
+
+@buildings_router.post("/join", status_code=201)
+def request_building_membership(
+    payload: BuildingJoin,
+    current_user: dict = Depends(get_current_user)
+):
+    building_code = payload.building_code.strip()
+
+    if not building_code:
+        raise HTTPException(status_code=422, detail="Building code cannot be empty")
+
+    with get_auth_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT building_id FROM buildings WHERE building_code = %s",
+                (building_code,)
+            )
+            building = cur.fetchone()
+
+            if not building:
+                raise HTTPException(status_code=404, detail="Invalid building code")
+
+            building_id = building[0]
+
+            cur.execute(
+                """
+                SELECT status FROM building_members
+                WHERE user_id = %s AND building_id = %s
+                """,
+                (current_user["user_id"], building_id)
+            )
+
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=409,
+                    detail="You already have a membership or request for this building"
+                )
+
+            cur.execute(
+                """
+                INSERT INTO building_members
+                    (user_id, building_id, role, status)
+                VALUES (%s, %s, 'member', 'pending')
+                """,
+                (current_user["user_id"], building_id)
+            )
+
+    return {
+        "message": "Building access request submitted",
+        "building_id": building_id,
+        "status": "pending"
     }
