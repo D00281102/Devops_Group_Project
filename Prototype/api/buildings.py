@@ -144,3 +144,55 @@ def request_building_membership(
         "building_id": building_id,
         "status": "pending"
     }
+
+
+@buildings_router.get("/{building_id}/requests")
+def get_pending_membership_requests(
+    building_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_auth_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM building_members
+                WHERE building_id = %s
+                  AND user_id = %s
+                  AND role = 'admin'
+                  AND status = 'approved'
+                """,
+                (building_id, current_user["user_id"])
+            )
+
+            if not cur.fetchone():
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only approved building admins can view membership requests"
+                )
+
+            cur.execute(
+                """
+                SELECT membership_id, user_id, role, status
+                FROM building_members
+                WHERE building_id = %s
+                  AND status = 'pending'
+                ORDER BY membership_id
+                """,
+                (building_id,)
+            )
+
+            requests = cur.fetchall()
+
+    return {
+        "building_id": building_id,
+        "requests": [
+            {
+                "membership_id": row[0],
+                "user_id": row[1],
+                "role": row[2],
+                "status": row[3]
+            }
+            for row in requests
+        ]
+    }
