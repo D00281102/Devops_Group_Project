@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from uuid import uuid4
-from api.models import BuildingCreate, BuildingJoin
+from api.models import BuildingCreate, BuildingJoin, MembershipDecision
 from api.auth import get_current_user
 from api.auth_db import get_auth_connection
 
@@ -195,4 +195,70 @@ def get_pending_membership_requests(
             }
             for row in requests
         ]
+    }
+
+
+@buildings_router.patch("/{building_id}/requests/{membership_id}")
+def decide_membership_request(
+    building_id: int,
+    membership_id: int,
+    payload: MembershipDecision,
+    current_user: dict = Depends(get_current_user)
+):
+    with get_auth_connection() as conn:
+        with conn.cursor() as cur:
+            # Only an approved building admin can decide requests.
+            cur.execute(
+                """
+                SELECT 1 FROM building_members
+                WHERE building_id = %s
+                  AND user_id = %s
+                  AND role = 'admin'
+                  AND status = 'approved'
+                """,
+                (building_id, current_user["user_id"])
+            )
+
+            if not cur.fetchone():
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only approved building admins can manage requests"
+                )
+
+            # Update only pending requests within this building.
+            cur.execute(
+                """
+                UPDATE building_members
+                SET status = %s
+                WHERE membership_id = %s
+                  AND building_id = %s
+                  AND status = 'pending'
+                  AND user_id <> %s
+                RETURNING membership_id, user_id, role, status
+                """,
+                (
+                    payload.status,
+                    membership_id,
+                    building_id,
+                    current_user["user_id"]
+                )
+            )
+
+            membership = cur.fetchone()
+
+            if not membership:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Request is unavailable, already processed, or belongs to the current user"
+                )
+
+    return {
+        "message": "Membership request " + payload.status,
+        "building_id": building_id,
+        "membership": {
+            "membership_id": membership[0],
+            "user_id": membership[1],
+            "role": membership[2],
+            "status": membership[3]
+        }
     }
