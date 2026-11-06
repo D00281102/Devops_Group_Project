@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -71,3 +72,7 @@ class BuildingCreate(BaseModel):
 
 class BuildingJoin(BaseModel):
     building_code: str = Field(min_length=1, max_length=64)   
+
+
+class MembershipDecision(BaseModel):
+    status: Literal["approved", "rejected"]
