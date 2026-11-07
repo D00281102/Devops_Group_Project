@@ -1,4 +1,4 @@
-services:
+﻿services:
   mosquitto:
     image: eclipse-mosquitto:2
     volumes:
@@ -45,7 +45,10 @@ services:
         condition: service_healthy
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.8
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka-connect
+    image: iot-kafka-connect:7.5.8
     ports:
       - "8083:8083"
     environment:
@@ -63,12 +66,7 @@ services:
       CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.converters.ByteArrayConverter
       CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/usr/share/java/mqtt
-    volumes:
-      - type: bind
-        source: C:/kafka/plugins
-        target: /usr/share/java/mqtt
-        read_only: true
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
     depends_on:
       kafka:
         condition: service_healthy
@@ -147,6 +145,28 @@ services:
       AUTH_DB_USER: ${AUTH_DB_USER:-postgres}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in your local .env file}
+
+  telemetry-consumer:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.api
+    image: iot-control-api:latest
+    command: ["python", "-u", "scripts/consumer.py"]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_TOPIC: sensor-telemetry
+      KAFKA_GROUP_ID: telemetry-postgres-writer
+      KAFKA_MAX_MESSAGES: "0"
+      DB_HOST: host.docker.internal
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+    depends_on:
+      kafka:
+        condition: service_healthy
 
 
 volumes:
