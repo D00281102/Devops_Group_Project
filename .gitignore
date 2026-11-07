@@ -6,3 +6,6 @@ grafana-dashboard-backup.json
 
 # Local environment variables and secrets
 .env
+
+# Local Grafana dashboard backups
+Prototype/grafana/backups/
