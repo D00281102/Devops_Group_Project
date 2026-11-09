@@ -205,7 +205,8 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - ./Prototype/control_settings_docker.sql:/docker-entrypoint-initdb.d/control_settings_docker.sql:ro
+      - ./Prototype/control_settings_docker.sql:/docker-entrypoint-initdb.d/001_control_settings.sql:ro
+      - ./Prototype/migrations/002_combined_control_db_schema.sql:/docker-entrypoint-initdb.d/002_combined_control_db_schema.sql:ro
       - controldb-data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: control_settings_db
