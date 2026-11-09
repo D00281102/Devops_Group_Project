@@ -1,6 +1,6 @@
 import psycopg
 import json
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
 import paho.mqtt.client as mqtt
 from api.db import get_connection, pool
 from api.control_db import get_control_connection
@@ -13,6 +13,7 @@ SENSOR_TOPIC = "sensors/telemetry"
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "sensor-telemetry")
 KAFKA_GROUP_ID = "control-logic-consumer"
+KAFKA_COMMAND_TOPIC = os.getenv("KAFKA_COMMAND_TOPIC", "actuator-commands")
 
 
 
@@ -219,20 +220,40 @@ def evaluate_sensor_data(sensor_data, settings=None):
 
     return commands
 
+_command_producer = None
+
+
+def get_command_producer():
+    """
+    Reuse one Kafka producer for actuator commands.
+    """
+    global _command_producer
+
+    if _command_producer is None:
+        _command_producer = KafkaProducer(
+            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+            value_serializer=lambda value: json.dumps(value).encode("utf-8")
+        )
+
+    return _command_producer
+
+
 def publish_actuator_command(client, command, building_id):
     """
-    Publish an actuator command to the correct building.
+    Publish a building-specific actuator command to Kafka.
     """
-    topic = f"buildings/{building_id}/actuators/commands"
-
-    # Include the building ID so the receiver can verify it.
     payload_data = {**command, "building_id": building_id}
-    payload = json.dumps(payload_data)
 
-    client.publish(topic, payload)
+    producer = get_command_producer()
+    producer.send(
+        KAFKA_COMMAND_TOPIC,
+        key=str(building_id).encode("utf-8"),
+        value=payload_data
+    ).get(timeout=10)
 
-    print(f"Published actuator command to: {topic}")
+    print(f"Published actuator command to Kafka: {KAFKA_COMMAND_TOPIC}")
     print(json.dumps(payload_data, indent=4))
+
 
 def on_message(client, userdata, message):
     """
@@ -317,6 +338,9 @@ def start_control_logic():
     finally:
         client.loop_stop()
         client.disconnect()
+        if _command_producer is not None:
+            _command_producer.flush()
+            _command_producer.close()
         pool.close()
 
 
