@@ -1,11 +1,9 @@
-
 services:
   mosquitto:
     image: eclipse-mosquitto:2
     volumes:
-      - ./Prototype/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    - ./Prototype/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
-
   kafka:
     image: apache/kafka-native
     ports:
@@ -37,7 +35,7 @@ services:
   kafka-ui:
     image: kafbat/kafka-ui:main
     ports:
-      - "8081:8080"
+      - 8081:8080
     environment:
       DYNAMIC_CONFIG_ENABLED: "true"
       KAFKA_CLUSTERS_0_NAME: local
@@ -47,7 +45,10 @@ services:
         condition: service_healthy
 
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.8
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka-connect
+    image: iot-kafka-connect:7.5.8
     ports:
       - "8083:8083"
     environment:
@@ -65,16 +66,10 @@ services:
       CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.converters.ByteArrayConverter
       CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/usr/share/java/mqtt
-    volumes:
-      - type: bind
-        source: C:/kafka/plugins
-        target: /usr/share/java/mqtt
-        read_only: true
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
     depends_on:
       kafka:
         condition: service_healthy
-
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -87,24 +82,6 @@ services:
       GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
     restart: unless-stopped
 
-  control-db:
-    image: ghcr.io/baosystems/postgis:17-3.5
-    ports:
-      - "5435:5432"
-    volumes:
-      - ./Prototype/control_settings_docker.sql:/docker-entrypoint-initdb.d/control_settings_docker.sql:ro
-      - controldb-data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: control_settings_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d control_settings_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   control-logic:
     build:
       context: ./Prototype
@@ -112,21 +89,43 @@ services:
     image: iot-control-logic:latest
     environment:
       PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_TOPIC: sensor-telemetry
+      KAFKA_COMMAND_TOPIC: actuator-commands
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
-      DB_HOST: host.docker.internal
+      DB_HOST: iot-postgres
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: control-db
+      CONTROL_DB_HOST: iot-postgres
       CONTROL_DB_PORT: "5432"
-      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_NAME: control_settings_db
       CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
+      CONTROL_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
     depends_on:
-      control-db:
+      kafka:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
+  kafka-mqtt-bridge:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.bridge
+    image: iot-kafka-mqtt-bridge:latest
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_COMMAND_TOPIC: actuator-commands
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
 
   sensor-simulator:
     build:
@@ -146,6 +145,7 @@ services:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
 
+
   control-api:
     build:
       context: ./Prototype
@@ -155,20 +155,65 @@ services:
       - "8000:8000"
     environment:
       DB_HOST: host.docker.internal
-      DB_PORT: "${DB_PORT:-5434}"
+      DB_PORT: "${DB_PORT:-5432}"
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: control-db
-      CONTROL_DB_PORT: "5432"
-      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
-      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
+      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_PORT: "${AUTH_DB_PORT:-5436}"
+      CONTROL_DB_NAME: ${AUTH_DB_NAME:-scrum108_test_db}
+      CONTROL_DB_USER: ${AUTH_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
+
+      AUTH_DB_HOST: ${AUTH_DB_HOST:?Set AUTH_DB_HOST in your local .env file}
+      AUTH_DB_PORT: ${AUTH_DB_PORT:-5436}
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-scrum108_test_db}
+      AUTH_DB_USER: ${AUTH_DB_USER:-postgres}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in your local .env file}
+
+  telemetry-consumer:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.api
+    image: iot-control-api:latest
+    command: ["python", "-u", "scripts/consumer.py"]
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_TOPIC: sensor-telemetry
+      KAFKA_GROUP_ID: telemetry-postgres-writer
+      KAFKA_MAX_MESSAGES: "0"
+      DB_HOST: host.docker.internal
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: ${DB_NAME:-postgres}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
     depends_on:
-      control-db:
+      kafka:
         condition: service_healthy
 
+
+  control-db:
+    image: ghcr.io/baosystems/postgis:17-3.5
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./Prototype/control_settings_docker.sql:/docker-entrypoint-initdb.d/control_settings_docker.sql:ro
+      - controldb-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: control_settings_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d control_settings_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
-  grafana-data:
   controldb-data:
     external: true
+  grafana-data:
