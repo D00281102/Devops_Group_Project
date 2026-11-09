@@ -321,8 +321,9 @@ def start_control_logic():
     try:
         client.loop_start()
 
-        print("Retrieving latest sensor reading from database...\n")
-        process_database_data(client)
+        # Historical telemetry lookup is optional for Kafka mode.
+        if os.getenv('PROCESS_HISTORICAL_TELEMETRY', 'false').lower() == 'true':
+            process_database_data(client)
 
         print(f"Listening for live sensor readings on: {SENSOR_TOPIC}")
 

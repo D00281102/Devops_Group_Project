@@ -89,18 +89,44 @@
     image: iot-control-logic:latest
     environment:
       PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_TOPIC: sensor-telemetry
+      KAFKA_COMMAND_TOPIC: actuator-commands
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
-      DB_HOST: host.docker.internal
+      DB_HOST: iot-postgres
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_HOST: iot-postgres
       CONTROL_DB_PORT: "5432"
-      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_NAME: control_settings_db
       CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
       CONTROL_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+  kafka-mqtt-bridge:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.bridge
+    image: iot-kafka-mqtt-bridge:latest
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_COMMAND_TOPIC: actuator-commands
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+
   sensor-simulator:
     build:
       context: ./Prototype
