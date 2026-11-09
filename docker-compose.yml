@@ -99,12 +99,14 @@ services:
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: iot-postgres
+      CONTROL_DB_HOST: control-db
       CONTROL_DB_PORT: "5432"
       CONTROL_DB_NAME: control_settings_db
       CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
     depends_on:
+      control-db:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       mosquitto:
@@ -159,11 +161,11 @@ services:
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: host.docker.internal
-      CONTROL_DB_PORT: "${AUTH_DB_PORT:-5436}"
-      CONTROL_DB_NAME: ${AUTH_DB_NAME:-scrum108_test_db}
-      CONTROL_DB_USER: ${AUTH_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
+      CONTROL_DB_HOST: control-db
+      CONTROL_DB_PORT: "5432"
+      CONTROL_DB_NAME: control_settings_db
+      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:?Set CONTROL_DB_PASSWORD in your local .env file}
 
       AUTH_DB_HOST: ${AUTH_DB_HOST:?Set AUTH_DB_HOST in your local .env file}
       AUTH_DB_PORT: ${AUTH_DB_PORT:-5436}
@@ -171,6 +173,9 @@ services:
       AUTH_DB_USER: ${AUTH_DB_USER:-postgres}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in your local .env file}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in your local .env file}
+    depends_on:
+      control-db:
+        condition: service_healthy
 
   telemetry-consumer:
     build:
