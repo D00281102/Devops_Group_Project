@@ -1,3 +1,4 @@
+import psycopg
 import json
 from kafka import KafkaConsumer
 import paho.mqtt.client as mqtt
@@ -276,8 +277,12 @@ def on_message(client, userdata, message):
 
         print()
 
-    except json.JSONDecodeError:
-            print("Error: Received message is not valid JSON.")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        print("Error: Received message is not valid JSON.")
+    except (psycopg.Error, RuntimeError) as error:
+        print(f"Database error: {error}. Skipping sensor reading.")
+    except (KeyError, TypeError, ValueError) as error:
+        print(f"Invalid sensor reading: {error}. Skipping.")
 
 def start_control_logic():
     """
