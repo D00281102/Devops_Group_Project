@@ -1,4 +1,5 @@
-﻿import json
+import json
+from kafka import KafkaConsumer
 import paho.mqtt.client as mqtt
 from api.db import get_connection, pool
 from api.control_db import get_control_connection
@@ -8,6 +9,9 @@ import os
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 SENSOR_TOPIC = "sensors/telemetry"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
+KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "sensor-telemetry")
+KAFKA_GROUP_ID = "control-logic-consumer"
 
 
 
@@ -173,8 +177,8 @@ def on_connect(client, userdata, flags, reason_code, properties):
         print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
         print("Actuator commands will be published to building-specific MQTT topics.")
 
-        client.subscribe(SENSOR_TOPIC)
-        print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
+        # Sensor telemetry is now consumed through Kafka.
+        print(f"Sensor telemetry source: Kafka topic {KAFKA_TOPIC}")
     else:
         print(f"MQTT connection failed: {reason_code}")
 
@@ -297,6 +301,7 @@ def start_control_logic():
         print(f"Listening for live sensor readings on: {SENSOR_TOPIC}")
 
         # Keep the control logic running to receive MQTT messages.
+        start_kafka_consumer(client)
         while True:
             import time
             time.sleep(1)
@@ -310,5 +315,30 @@ def start_control_logic():
         pool.close()
 
 
+def start_kafka_consumer(client):
+    """
+    Consume Kafka telemetry using the existing control logic.
+    """
+    consumer = KafkaConsumer(
+        KAFKA_TOPIC,
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        group_id=KAFKA_GROUP_ID,
+        auto_offset_reset="latest",
+        enable_auto_commit=True
+    )
+
+    print(f"Listening for Kafka telemetry on: {KAFKA_TOPIC}")
+
+    try:
+        for message in consumer:
+            class SensorMessage:
+                payload = message.value
+
+            on_message(client, None, SensorMessage())
+
+    finally:
+        consumer.close()
+
 if __name__ == "__main__":
     start_control_logic()
+
