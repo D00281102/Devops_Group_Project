@@ -11,7 +11,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = "sensors/telemetry"
 
 # Path to the IoT telemetry dataset
-BUILDING_ID = os.getenv("BUILDING_ID", "building_1")
+BUILDING_ID = int(os.getenv("BUILDING_ID", "1"))
 DEVICE_ID = os.getenv("DEVICE_ID", "")
 DATASET_PATH = os.getenv("DATASET_PATH", "data/iot_telemetry_data.csv")
 
@@ -29,18 +29,52 @@ MAX_READINGS = 10
 
 def create_sensor_message(row):
     """
-    Convert a CSV row into a structured sensor message.
+    Normalise different CSV formats into one sensor message.
     """
+
+    # Match different CSV column names
+    columns = {key.strip().lower(): value for key, value in row.items() if key}
+
+    def get_value(*names):
+        for name in names:
+            value = columns.get(name.lower())
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return None
+
+    def get_number(*names):
+        value = get_value(*names)
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            return None
+
+    def get_boolean(*names):
+        value = get_value(*names)
+        if value is None:
+            return None
+        if value.lower() in ("true", "1", "yes"):
+            return True
+        if value.lower() in ("false", "0", "no"):
+            return False
+        return None
+
+    # Preserve original device IDs unless overridden
+    device = DEVICE_ID or get_value("device", "device_id")
+
     return {
-        "ts": float(row["ts"]),
-        "device": DEVICE_ID or row.get("device") or row.get("Device_ID"),
-        "co": float(row["co"]),
-        "humidity": float(row["humidity"]),
-        "light": row["light"].lower() == "true",
-        "lpg": float(row["lpg"]),
-        "motion": row["motion"].lower() == "true",
-        "smoke": float(row["smoke"]),
-        "temp": float(row["temp"])
+        "building_id": BUILDING_ID,
+        "ts": get_number("ts", "timestamp"),
+        "device": device,
+        "co": get_number("co"),
+        "humidity": get_number("humidity"),
+        "light": get_boolean("light"),
+        "lpg": get_number("lpg"),
+        "motion": get_boolean("motion"),
+        "smoke": get_number("smoke"),
+        "temp": get_number("temp", "temperature")
     }
 
 def connect_to_mqtt():
