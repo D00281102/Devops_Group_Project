@@ -11,7 +11,13 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = "sensors/telemetry"
 
 # Path to the IoT telemetry dataset
-DATA_FILE = Path(__file__).parent / "data" / "iot_telemetry_data.csv"
+BUILDING_ID = os.getenv("BUILDING_ID", "building_1")
+DEVICE_ID = os.getenv("DEVICE_ID", "")
+DATASET_PATH = os.getenv("DATASET_PATH", "data/iot_telemetry_data.csv")
+
+DATA_FILE = Path(DATASET_PATH)
+if not DATA_FILE.is_absolute():
+    DATA_FILE = Path(__file__).parent / DATA_FILE
 
 
 # Replay the dataset faster than real time
@@ -27,7 +33,7 @@ def create_sensor_message(row):
     """
     return {
         "ts": float(row["ts"]),
-        "device": row["device"],
+        "device": DEVICE_ID or row.get("device") or row.get("Device_ID"),
         "co": float(row["co"]),
         "humidity": float(row["humidity"]),
         "light": row["light"].lower() == "true",
