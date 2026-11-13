@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS iot_telemetry_data (
+    records  SERIAL PRIMARY KEY,
+    ts       DOUBLE PRECISION NOT NULL,
+    device   TEXT NOT NULL,
+    co       DOUBLE PRECISION NOT NULL,
+    humidity DOUBLE PRECISION NOT NULL,
+    light    BOOLEAN NOT NULL,
+    lpg      DOUBLE PRECISION NOT NULL,
+    motion   BOOLEAN NOT NULL,
+    smoke    DOUBLE PRECISION NOT NULL,
+    temp     DOUBLE PRECISION NOT NULL
+);

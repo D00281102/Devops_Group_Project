@@ -6,9 +6,9 @@ datasources:
     uid: afzqyiomihla8d
     type: grafana-postgresql-datasource
     access: proxy
-    url: host.docker.internal:5432
-    user: postgres
-    database: postgres
+    url: postgres:5432
+    user: $GF_DATASOURCE_USER
+    database: $GF_DATASOURCE_NAME
     isDefault: true
     editable: true
     secureJsonData:

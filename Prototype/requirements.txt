@@ -6,3 +6,5 @@ python-dotenv
 psycopg_pool
 kafka-python
 requests
+pwdlib[argon2]
+PyJWT

@@ -22,7 +22,16 @@ def start_kafka_KafkaUI():
     subprocess.run([
         'docker', 'compose',
         '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
-        'up', '-d', 'postgres', 'mosquitto', 'kafka', 'kafka-ui', 'kafka-connect'
+        'up', '-d', 'postgres', 'mosquitto', 'kafka',
+        'kafka-ui', 'kafka-connect'
+    ], cwd=PROJECT_ROOT, check=True)
+
+
+def initialize_databases():
+    subprocess.run([
+        'docker', 'compose',
+        '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
+        'run', '--rm', 'database-init'
     ], cwd=PROJECT_ROOT, check=True)
 
 
@@ -121,6 +130,7 @@ def run_database_consumer():
 
 def start_kafka():
     start_kafka_KafkaUI()
+    initialize_databases()
     wait_for_postgres()
     wait_for_kafka()
     create_kafka_topic()

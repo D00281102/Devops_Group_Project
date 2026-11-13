@@ -16,6 +16,24 @@ services:
       timeout: 3s
       retries: 20
 
+  database-init:
+    image: postgres:17
+    command: ["bash", "/init/init-databases.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${DB_USER:-postgres}
+      PGPASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
+      DB_NAME: ${DB_NAME:-postgres}
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+    volumes:
+      - ./Prototype/database:/schema:ro
+      - ./Prototype/migrations/002_combined_control_db_schema.sql:/migrations/002_combined_control_db_schema.sql:ro
+      - ./Prototype/scripts/init-databases.sh:/init/init-databases.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   mosquitto:
     image: eclipse-mosquitto:2
     ports:
@@ -103,7 +121,9 @@ services:
       - ./Prototype/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./Prototype/grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
-      GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD:-${DB_PASSWORD}}
+      GF_DATASOURCE_USER: ${DB_USER:-postgres}
+      GF_DATASOURCE_NAME: ${DB_NAME:-postgres}
+      GF_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
     restart: unless-stopped
 
   control-logic:
@@ -120,14 +140,14 @@ services:
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_HOST: postgres
       CONTROL_DB_PORT: "5432"
       CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
-      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+      CONTROL_DB_USER: ${DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
       mosquitto:
         condition: service_started
 
@@ -168,14 +188,20 @@ services:
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
-      CONTROL_DB_HOST: host.docker.internal
-      CONTROL_DB_PORT: "${CONTROL_DB_PORT:-5432}"
+      CONTROL_DB_HOST: postgres
+      CONTROL_DB_PORT: "5432"
       CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
-      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
-      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+      CONTROL_DB_USER: ${DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
+      AUTH_DB_HOST: postgres
+      AUTH_DB_PORT: "5432"
+      AUTH_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      AUTH_DB_USER: ${DB_USER:-postgres}
+      AUTH_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in Prototype/.env}
     depends_on:
-      postgres:
-        condition: service_healthy
+      database-init:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

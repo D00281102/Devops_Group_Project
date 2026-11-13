@@ -77,6 +77,40 @@ py -m pip install -r Prototype/requirements.txt
 
 ```
 
+## PostgreSQL databases and initialization
+
+Compose runs one PostgreSQL server with persistent storage in the
+`postgres_data` volume. It initializes the telemetry database (the `DB_NAME`,
+`postgres` by default) and a separate `control_settings_db`. Authentication
+and control tables share `control_settings_db`, matching the combined
+SCRUM-111 schema and the application's building/device relationships.
+
+The `database-init` service creates the control database if needed, then
+idempotently initializes the telemetry table, default control settings, and
+authentication/building tables. The API and Control Logic wait for that
+service to complete before starting. The initializer can also run against an
+existing PostgreSQL volume without deleting its data.
+
+Create `Prototype/.env` from `.env.example`, set `DB_PASSWORD` and
+`AUTH_SECRET_KEY` to private values, and set `CONTROL_DB_PASSWORD` and
+`AUTH_DB_PASSWORD` to the same PostgreSQL password. Start the stack from the
+repository root:
+
+```powershell
+docker compose --env-file Prototype/.env up -d
+```
+
+Windows-hosted applications connect at `localhost:5434`; Compose services
+connect to `postgres:5432`. Do not run `docker compose down -v` unless you
+intend to delete the persistent PostgreSQL data.
+
+Confirm both databases and their tables were initialized:
+
+```powershell
+docker compose --env-file Prototype/.env exec postgres psql -U postgres -d postgres -c "\dt"
+docker compose --env-file Prototype/.env exec postgres psql -U postgres -d control_settings_db -c "\dt"
+```
+
 ## Move the existing database into Docker
 
 Back up the existing local PostgreSQL database before stopping it. Run from
@@ -101,6 +135,9 @@ Start the PostgreSQL container with the credentials from `Prototype/.env`:
 docker compose --env-file Prototype/.env up -d postgres
 ```
 
+For an empty Docker volume, wait until the telemetry backup has been restored
+before starting `database-init`; the initializer creates the telemetry table.
+
 Wait for `docker compose --env-file Prototype/.env ps postgres` to show the
 container as healthy.
 
@@ -108,6 +145,12 @@ Restore the backup into the container:
 
 ```powershell
 psql -h localhost -p 5434 -U postgres -d postgres -v ON_ERROR_STOP=1 -f .\Prototype\data\telemetry-backup.sql
+```
+
+Then initialize the remaining tables and the control/authentication database:
+
+```powershell
+docker compose --env-file Prototype/.env run --rm database-init
 ```
 
 The compose service keeps the database in the `postgres_data` named volume.
@@ -331,12 +374,14 @@ All three Python services connect to the Docker MQTT broker using `mosquitto:188
 
 Open PowerShell in the project root directory.
 
-Ensure Docker Desktop is running. The telemetry PostgreSQL database runs
-from this Compose file; Control Logic's `control_settings_db` is a separate
-existing database and must be available using the configured settings.
+Ensure Docker Desktop is running. Compose initializes the telemetry database
+and the combined control/authentication `control_settings_db` on the same
+PostgreSQL server.
 
-Create `Prototype/.env` containing the database settings used by the
-PostgreSQL container and Python API:
+Create `Prototype/.env` from the repository's `.env.example`. Set private
+values for `DB_PASSWORD` and `AUTH_SECRET_KEY`. The control and authentication
+database names should both be `control_settings_db`, with the same PostgreSQL
+user and password:
 
 ```dotenv
 DB_HOST=localhost
@@ -344,6 +389,17 @@ DB_PORT=5434
 DB_NAME=postgres
 DB_USER=postgres
 DB_PASSWORD=choose_a_private_password
+CONTROL_DB_HOST=localhost
+CONTROL_DB_PORT=5434
+CONTROL_DB_NAME=control_settings_db
+CONTROL_DB_USER=postgres
+CONTROL_DB_PASSWORD=choose_a_private_password
+AUTH_DB_HOST=localhost
+AUTH_DB_PORT=5434
+AUTH_DB_NAME=control_settings_db
+AUTH_DB_USER=postgres
+AUTH_DB_PASSWORD=choose_a_private_password
+AUTH_SECRET_KEY=replace_with_a_secure_random_secret
 ```
 
 Do not commit `.env` files or database passwords to Git. Set any Grafana or
@@ -373,8 +429,8 @@ docker compose --env-file Prototype/.env ps
 
 The telemetry API and Kafka consumer connect to the Compose PostgreSQL
 service through `localhost:5434` from Windows. The Dockerized Control Logic
-connects to the telemetry service by the Compose hostname `postgres` on port
-5432. Its control settings database remains separately configurable.
+connects to the PostgreSQL server by the Compose hostname `postgres` on port
+5432. Its control/authentication database is `control_settings_db`.
 
 The Docker Compose configuration uses:
 
@@ -383,12 +439,14 @@ The Docker Compose configuration uses:
 | `DB_HOST` | `postgres` inside Docker; `localhost` on Windows |
 | `DB_PORT` | `5432` inside Docker; `5434` on Windows |
 | `DB_NAME` | `postgres` by default |
-| `CONTROL_DB_HOST` | `host.docker.internal` |
-| `CONTROL_DB_PORT` | Configured host PostgreSQL port |
+| `CONTROL_DB_HOST` | `postgres` inside Docker; `localhost` on Windows |
+| `CONTROL_DB_PORT` | `5432` inside Docker; `5434` on Windows |
 | `CONTROL_DB_NAME` | `control_settings_db` by default |
+| `AUTH_DB_NAME` | Same as `CONTROL_DB_NAME` |
 
-The actual control database name and credentials must match the PostgreSQL
-instance containing `control_settings_db`.
+`database-init` creates and initializes `control_settings_db` on the Compose
+PostgreSQL server. The Compose API and Control Logic services use the internal
+Docker hostname; local Windows processes use the published host port.
 
 Control settings are retrieved from the `control_settings` table, including:
 
@@ -456,8 +514,8 @@ The IoT control components have been containerised and tested together.
 
 Before the full group deployment, the following integration points should be reviewed:
 
-1. Confirm that the existing `control_settings_db` is reachable using the
-   configured `CONTROL_DB_*` settings.
+1. Confirm that `database-init` completes successfully and both applications
+   connect to the initialized `control_settings_db`.
 2. Verify that Kafka Connect loads the MQTT plugin from the configured host
    plugin directory.
 3. Replace the Windows-specific Kafka Connect plugin path when running on a

@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+
+from psycopg.conninfo import make_conninfo
 from dotenv import load_dotenv
 
 #Loading the .env file that will live one folder up from this file
@@ -15,5 +17,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 if not DB_PASSWORD:
     raise RuntimeError("DB_PASSWORD is missing from Prototype/.env")
 
-#Full connection string that psycopg will use
-DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Connection string that safely handles reserved characters in credentials.
+DATABASE_URL = make_conninfo(
+    host=DB_HOST,
+    port=DB_PORT,
+    dbname=DB_NAME,
+    user=DB_USER,
+    password=DB_PASSWORD,
+)
