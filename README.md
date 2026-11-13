@@ -579,12 +579,66 @@ GitHub Actions runs the database-free Python checks on every branch push and
 pull request. After they pass, it builds the API, Control Logic, Sensor
 Simulator, and Actuator Simulator Docker images. Builds on the repository's
 `main` branch are published to GitHub Container Registry (GHCR). Kubernetes
-deployment is a later job that runs only when `K8S_DEPLOY_ENABLED` is set to
-`true` in repository variables. See [k8s/README.md](k8s/README.md) for cluster
-prerequisites and setup.
+deployment runs only when the repository variable `K8S_DEPLOY_ENABLED` is set
+to `true`. See [k8s/README.md](k8s/README.md) for cluster prerequisites and
+setup.
 
 Database-backed tests are not included because they currently require an
 interactive password or a separately seeded test database.
+
+### Run the CI checks locally (PowerShell)
+
+From the repository root, create a Python 3.12 virtual environment and install
+the project dependencies:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r Prototype\requirements.txt
+```
+
+Set dummy database values. These match the CI environment and do not require a
+running PostgreSQL server:
+
+```powershell
+$env:DB_HOST = "127.0.0.1"
+$env:DB_PORT = "1"
+$env:DB_NAME = "postgres"
+$env:DB_USER = "postgres"
+$env:DB_PASSWORD = "ci-only-placeholder"
+$env:CONTROL_DB_PASSWORD = "ci-only-placeholder"
+$env:AUTH_DB_PASSWORD = "ci-only-placeholder"
+$env:AUTH_SECRET_KEY = "ci-only-placeholder"
+```
+
+Run the same two scripts as the GitHub Actions job:
+
+```powershell
+Push-Location .\Prototype
+& ..\.venv\Scripts\python.exe test_sensor_analytics.py
+& ..\.venv\Scripts\python.exe test_control_logic.py
+Pop-Location
+```
+
+### Build the CI Docker images locally
+
+With Docker Desktop running, execute these from the repository root. They
+build the same four images as CI but do not publish them:
+
+```powershell
+docker build -f Prototype\Dockerfile.api -t ci-control-api Prototype
+docker build -f Prototype\Dockerfile.control -t ci-control-logic Prototype
+docker build -f Prototype\Dockerfile.sensor -t ci-sensor-simulator Prototype
+docker build -f Prototype\Dockerfile.actuator -t ci-actuator-simulator Prototype
+```
+
+### View a GitHub Actions run
+
+Push a commit to any branch or open a pull request, then open the repository's
+**Actions** tab and select the **CI** workflow. A successful run shows both
+Python checks and all four Docker image builds passed. Only a push to `main`
+publishes images; Kubernetes deployment has the additional setup and gate
+described in [k8s/README.md](k8s/README.md).
 
 ---
 
