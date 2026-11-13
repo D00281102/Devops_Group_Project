@@ -4,12 +4,5 @@ uvicorn
 psycopg[binary]
 python-dotenv
 psycopg_pool
-<<<<<<< HEAD
-requests
-pwdlib[argon2]
-PyJWT
-kafka-python
-=======
 kafka-python
 requests
->>>>>>> main

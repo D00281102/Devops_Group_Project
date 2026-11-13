@@ -5,13 +5,7 @@ import os
 # MQTT configuration
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-<<<<<<< HEAD
-# Each simulator listens for commands for its own building.
-BUILDING_ID = int(os.getenv("BUILDING_ID", "1"))
-ACTUATOR_TOPIC = f"buildings/{BUILDING_ID}/actuators/commands"
-=======
 ACTUATOR_TOPIC = "actuators/commands"
->>>>>>> main
 
 
 def on_connect(client, userdata, flags, reason_code, properties):

@@ -1,75 +1,11 @@
-<<<<<<< HEAD
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-
-from api.control_db import get_control_connection
-from api.models import ControlSettings
-from api.auth import get_current_user
-=======
 from fastapi import APIRouter
 
 from api.control_db import get_control_connection
 from api.models import ControlSettings
->>>>>>> main
 
 control_router = APIRouter(tags=["control-settings"])
 
 
-<<<<<<< HEAD
-def get_user_building(cur, user_id, building_id=None, require_admin=False):
-    query = """
-        SELECT b.building_id, b.building_name, bm.role
-        FROM buildings b
-        JOIN building_members bm
-            ON b.building_id = bm.building_id
-        WHERE bm.user_id = %s
-          AND bm.status = 'approved'
-    """
-    params = [user_id]
-
-    if building_id is not None:
-        query += " AND b.building_id = %s"
-        params.append(building_id)
-
-    if require_admin:
-        query += " AND bm.role = 'admin'"
-
-    query += " ORDER BY b.building_id LIMIT 1"
-
-    cur.execute(query, tuple(params))
-    building = cur.fetchone()
-
-    if building is None:
-        raise HTTPException(
-            status_code=403,
-            detail="You do not have approved access to this building or permission to update its settings"
-        )
-
-    return building
-
-
-@control_router.get("/control-settings", response_model=ControlSettings)
-def get_control_settings(
-    building_id: int | None = Query(default=None),
-    current_user: dict = Depends(get_current_user)
-):
-    with get_control_connection() as conn:
-        with conn.cursor() as cur:
-            building = get_user_building(
-                cur, current_user["user_id"], building_id
-            )
-
-            cur.execute(
-                """
-                SELECT temperature_threshold, humidity_threshold,
-                       light_enabled, updated_at
-                FROM control_settings
-                WHERE building_id = %s
-                """,
-                (building[0],)
-            )
-
-=======
 @control_router.get("/control-settings", response_model=ControlSettings)
 def get_control_settings():
     with get_control_connection() as conn:
@@ -81,25 +17,12 @@ def get_control_settings():
                 WHERE id = 1
                 """
             )
->>>>>>> main
             row = cur.fetchone()
 
             if row is None:
                 cur.execute(
                     """
                     INSERT INTO control_settings (
-<<<<<<< HEAD
-                        temperature_threshold,
-                        humidity_threshold,
-                        light_enabled,
-                        building_id
-                    )
-                    VALUES (25, 70, TRUE, %s)
-                    RETURNING temperature_threshold, humidity_threshold,
-                              light_enabled, updated_at
-                    """,
-                    (building[0],)
-=======
                         id, temperature_threshold, humidity_threshold,
                         light_enabled
                     )
@@ -107,7 +30,6 @@ def get_control_settings():
                     RETURNING temperature_threshold, humidity_threshold,
                               light_enabled, updated_at
                     """
->>>>>>> main
                 )
                 row = cur.fetchone()
                 conn.commit()
@@ -121,34 +43,6 @@ def get_control_settings():
 
 
 @control_router.put("/control-settings", response_model=ControlSettings)
-<<<<<<< HEAD
-def update_control_settings(
-    payload: ControlSettings,
-    building_id: int | None = Query(default=None),
-    current_user: dict = Depends(get_current_user)
-):
-    with get_control_connection() as conn:
-        with conn.cursor() as cur:
-            building = get_user_building(
-                cur,
-                current_user["user_id"],
-                building_id,
-                require_admin=True
-            )
-
-            cur.execute(
-                """
-                INSERT INTO control_settings (
-                    temperature_threshold,
-                    humidity_threshold,
-                    light_enabled,
-                    building_id,
-                    updated_at
-                )
-                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
-                ON CONFLICT (building_id)
-                WHERE building_id IS NOT NULL
-=======
 def update_control_settings(payload: ControlSettings):
     with get_control_connection() as conn:
         with conn.cursor() as cur:
@@ -160,7 +54,6 @@ def update_control_settings(payload: ControlSettings):
                 )
                 VALUES (1, %s, %s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (id)
->>>>>>> main
                 DO UPDATE SET
                     temperature_threshold = EXCLUDED.temperature_threshold,
                     humidity_threshold = EXCLUDED.humidity_threshold,
@@ -173,15 +66,8 @@ def update_control_settings(payload: ControlSettings):
                     payload.temperature_threshold,
                     payload.humidity_threshold,
                     payload.light_enabled,
-<<<<<<< HEAD
-                    building[0],
                 ),
             )
-
-=======
-                ),
-            )
->>>>>>> main
             row = cur.fetchone()
             conn.commit()
 

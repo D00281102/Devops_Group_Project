@@ -1,0 +1,113 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Inspect Git status",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Inspect branch references",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"branch",
+				"-avv"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check merge conflict index",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"ls-files",
+				"-u"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check markers on main",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-c",
+				"core.pager=cat",
+				"grep",
+				"-n",
+				"-E",
+				"^(<<<<<<< |=======|>>>>>>> |\\|\\|\\|\\|\\|\\|\\| )",
+				"main",
+				"--"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Compare main revisions",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"rev-parse",
+				"HEAD",
+				"main",
+				"origin/main",
+				"origin/HEAD"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Fetch latest main reference",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"fetch",
+				"--no-tags",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Identify fetched main revision",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"rev-parse",
+				"FETCH_HEAD",
+				"origin/main",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Verify fetched main markers",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-c",
+				"core.pager=cat",
+				"grep",
+				"-n",
+				"-E",
+				"^(<<<<<<< |=======|>>>>>>> |\\|\\|\\|\\|\\|\\|\\| )",
+				"origin/main",
+				"--"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

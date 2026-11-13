@@ -12,26 +12,17 @@ from dotenv import dotenv_values
 KAFKA_HOME = r"C:\kafka"
 CONNECT_URL = "http://localhost:8083"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-<<<<<<< HEAD
-ENV_FILE = PROJECT_ROOT / "Prototype" / ".env"
-=======
 DB_PORT = int(
     dotenv_values(PROJECT_ROOT / "Prototype" / ".env").get("DB_PORT") or 5434
 )
->>>>>>> main
 
 
 def start_kafka_KafkaUI():
     # Start the shared database, MQTT broker, Kafka, UI, and Connect services.
     subprocess.run([
         'docker', 'compose',
-<<<<<<< HEAD
-        '--env-file', str(ENV_FILE),
-        'up', '-d', 'kafka', 'kafka-ui', 'kafka-connect'
-=======
         '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
         'up', '-d', 'postgres', 'mosquitto', 'kafka', 'kafka-ui', 'kafka-connect'
->>>>>>> main
     ], cwd=PROJECT_ROOT, check=True)
 
 

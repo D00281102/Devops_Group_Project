@@ -364,23 +364,11 @@ Mosquitto
     |
     v
 Kafka Connect MQTT Source Connector
-<<<<<<< HEAD
-    |
-    v
-Kafka Topic: sensor-telemetry
-    |
-    v
-Python Telemetry Consumer
-    |
-    v
-PostgreSQL: iot_telemetry_data
-=======
      ↓ Kafka: sensor-telemetry
 Apache Kafka Broker (localhost:9092)
      ↓
 Python database consumer
      ↓ PostgreSQL: existing iot_telemetry_data table
->>>>>>> main
 ```
 
 ## Kafka Components
@@ -395,11 +383,7 @@ The Docker-based setup uses:
 - Python Kafka consumer.
 - PostgreSQL database containing the `iot_telemetry_data` table.
 
-<<<<<<< HEAD
-The Kafka Connect service uses a custom Docker image built from `Dockerfile.kafka-connect`. This image installs the MQTT source connector automatically, so team members do not need to download and copy connector JAR files manually.
-=======
 Kafka broker, Kafka Connect, Mosquitto, the database consumer, and the sensor are separate processes. The database consumer uses the existing PostgreSQL database configured in `Prototype/.env`; it does not create a database.
->>>>>>> main
 
 ## Environment Setup
 
@@ -456,9 +440,6 @@ The MQTT source connector uses the following configuration:
 - Kafka topic: `sensor-telemetry`
 - MQTT QoS: `0`
 
-<<<<<<< HEAD
-The hostname `mosquitto` is used because Kafka Connect communicates with Mosquitto through the Docker Compose network.
-=======
 ### 5. Start the Database Consumer
 
 In the terminal named `database consumer`, from the `Prototype` folder:
@@ -485,7 +466,6 @@ py .\Prototype\Data_Sensor.py
 ## Verify Kafka Connect
 
 Use a separate PowerShell terminal for these commands.
->>>>>>> main
 
 Check that Kafka Connect is responding:
 
@@ -509,95 +489,11 @@ RUNNING
 
 The Python consumer is located at:
 
-<<<<<<< HEAD
-```text
-Prototype/scripts/consumer.py
-```
-
-It reads messages from the `sensor-telemetry` Kafka topic and inserts valid telemetry records into the PostgreSQL table:
-
-```text
-iot_telemetry_data
-```
-
-The consumer uses the following environment configuration:
-
-- `KAFKA_BOOTSTRAP_SERVERS`
-- `KAFKA_TOPIC`
-- `KAFKA_GROUP_ID`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-
-The consumer runs inside Docker Compose and restarts automatically if its container stops.
-
-View consumer logs:
-
-```powershell
-docker compose logs --tail 50 telemetry-consumer
-```
-
-Successful database insertion should produce messages similar to:
-
-```text
-Inserted telemetry record 1: bright-final-test
-```
-
-## Starting the Sensor Simulator
-
-Once the Docker services are running, start the sensor simulator from another PowerShell terminal:
-
-```powershell
-py Prototype/Data_Sensor.py
-```
-
-The simulator reads the CSV dataset and publishes JSON telemetry messages to the MQTT topic:
-
-```text
-sensors/telemetry
-```
-
-The messages are then forwarded through Kafka and stored in PostgreSQL.
-
-## Verifying the Pipeline
-
-Check the Docker services:
-
-```powershell
-docker compose ps
-```
-
-Check Kafka Connect:
-
-```powershell
-Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
-```
-
-Check the telemetry consumer:
-
-```powershell
-docker compose logs --tail 50 telemetry-consumer
-```
-
-To confirm that telemetry records have reached PostgreSQL, run:
-
-```sql
-SELECT device, ts, light, motion, temp
-FROM iot_telemetry_data
-ORDER BY ts DESC
-LIMIT 10;
-```
-
-If records appear in the query results, the Kafka-to-PostgreSQL integration is working.
-=======
 - `mosquitto_sub` displays messages on `sensors/telemetry`.
 - The Kafka Connect connector reads those MQTT messages.
 - The database consumer inserts records from `sensor-telemetry` into the
   configured PostgreSQL `iot_telemetry_data` table.
 - The original sensor JSON is forwarded as the Kafka record value.
->>>>>>> main
 
 ## Troubleshooting
 
@@ -2110,42 +2006,15 @@ Actuator Simulator
 This demonstrates a working IoT control pipeline where simulated sensor data can automatically generate and execute simulated actuator actions.
 
 ---
-<<<<<<< HEAD
-
-## Grafana Visualisation
-## Overview
-=======
 ## Grafana Visualisation
 
 ## Overview
 
->>>>>>> main
 Grafana is used to visualise the IoT sensor data stored in the project PostgreSQL database.
 
 The current local data flow is:
 
 ```text
-<<<<<<< HEAD
-
-IoT Telemetry Dataset
-
-        ↓
-
-PostgreSQL Database
-
-        ↓
-
-Grafana PostgreSQL Datasource
-
-        ↓
-
-Grafana Dashboard
-
-        ↓
-
-Sensor Visualisation Panels
-```
-=======
 IoT Telemetry Dataset
         ↓
 PostgreSQL Database
@@ -2155,30 +2024,12 @@ Grafana PostgreSQL Datasource
 Grafana Dashboard
         ↓
 Sensor Visualisation Panels
->>>>>>> main
 
 The sensor data is stored in the iot_telemetry_data table in PostgreSQL.
 
 The table contains the following sensor fields:
 
 ts - Timestamp
-<<<<<<< HEAD
-
-device - Device name
-
-co - Carbon monoxide reading
-
-humidity - Humidity reading
-
-light - Light status
-
-lpg - LPG reading
-
-motion - Motion status
-
-smoke - Smoke reading
-
-=======
 device - Device name
 co - Carbon monoxide reading
 humidity - Humidity reading
@@ -2186,7 +2037,6 @@ light - Light status
 lpg - LPG reading
 motion - Motion status
 smoke - Smoke reading
->>>>>>> main
 temp - Temperature reading
 
 The dataset contains approximately 405,000 sensor readings.
@@ -2204,16 +2054,8 @@ The PostgreSQL database is running locally on port 5432.
 Grafana connects to PostgreSQL using the following settings:
 
 Host: host.docker.internal:5432
-<<<<<<< HEAD
-
-Database: postgres
-
-User: postgres
-
-=======
 Database: postgres
 User: postgres
->>>>>>> main
 SSL Mode: disable
 
 The PostgreSQL password is not stored in this documentation.
@@ -2229,25 +2071,11 @@ The datasource was then used in Grafana Explore to confirm that real sensor data
 Example query:
 
 SELECT
-<<<<<<< HEAD
-
-    to_timestamp(ts) AS "time",
-
-    temp
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-=======
     to_timestamp(ts) AS "time",
     temp
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
->>>>>>> main
 Dashboard
 
 A Grafana dashboard called:
@@ -2259,25 +2087,11 @@ was created using the project sensor data.
 The dashboard contains the following visualisation panels:
 
 Humidity Readings
-<<<<<<< HEAD
-
-Temperature Readings
-
-CO Readings
-
-LPG Readings
-
-Smoke Readings
-
-Motion Readings
-
-=======
 Temperature Readings
 CO Readings
 LPG Readings
 Smoke Readings
 Motion Readings
->>>>>>> main
 Light Readings
 
 The dashboard was tested using the real data stored in PostgreSQL.
@@ -2289,89 +2103,6 @@ The panels use the ts field as the time value and the relevant sensor field for 
 ## Example temperature query:
 
 ```sql
-<<<<<<< HEAD
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    temp
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-```
-
-## Example humidity query:
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    humidity
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-```
-
-## Example CO query:
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    co
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-```
-
-## Example LPG query:
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    lpg
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-```
-
-## Example smoke query:
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    smoke
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-=======
 SELECT
     to_timestamp(ts) AS "time",
     temp
@@ -2422,45 +2153,11 @@ SELECT
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
->>>>>>> main
 ```
 
 For the boolean sensor values, the same approach is used with the motion and light fields.
 
 ## Example motion query:
-<<<<<<< HEAD
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    motion
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-```
-
-## Example light query:
-```sql
-
-SELECT
-
-    to_timestamp(ts) AS "time",
-
-    light
-
-FROM iot_telemetry_data
-
-ORDER BY ts
-
-LIMIT 100;
-
-=======
 
 ```sql
 SELECT
@@ -2480,51 +2177,27 @@ SELECT
 FROM iot_telemetry_data
 ORDER BY ts
 LIMIT 100;
->>>>>>> main
 ```
 
 ## Testing
 The datasource and dashboard are configured using the files in `Prototype/grafana/provisioning` and `Prototype/grafana/dashboards`. Grafana uses the `grafana-data` Docker volume to preserve its data when the container is recreated.
-<<<<<<< HEAD
-
-=======
->>>>>>> main
 The Grafana datasource was tested successfully against the local PostgreSQL database.
 
 The dashboard contains the following visualisation panels:
 
 - Humidity Readings
-<<<<<<< HEAD
-
-- Temperature Readings
-
-- CO Readings
-
-- LPG Readings
-
-- Smoke Readings
-
-- Current Motion Status
-
-- Current Light Status
-
-=======
 - Temperature Readings
 - CO Readings
 - LPG Readings
 - Smoke Readings
 - Current Motion Status
 - Current Light Status
->>>>>>> main
 - Current Temperature
 
 The final dashboard was saved after removing duplicate panels.
 
 ## Reproducing the Grafana Setup
-<<<<<<< HEAD
-=======
 
->>>>>>> main
 To reproduce the Grafana setup on another machine:
 
 - Install Docker Desktop and make sure it is running.
@@ -2533,27 +2206,6 @@ To reproduce the Grafana setup on another machine:
 
 - In the project root directory, copy .env.example to .env.
 
-<<<<<<< HEAD
-- Open `.env` and configure the required environment variables using your local database credentials. This includes `DB_PASSWORD`, `GF_DATASOURCE_PASSWORD`, `AUTH_DB_HOST`, `AUTH_DB_PASSWORD` and `AUTH_SECRET_KEY`. Check the database settings and passwords for your local environment. Do not commit or share this file.
-
-- Open PowerShell in the project root directory.
-
-- Validate the Docker Compose configuration:
-
-  ```powershell
-
-  docker compose config --quiet
-
-  ```
-
-- Start Grafana:
-
-  ```powershell
-
-  docker compose up -d grafana
-
-  ```
-=======
 - Open .env and set GF_DATASOURCE_PASSWORD to the password for the local PostgreSQL user. Do not commit or share this file.
 
 - Open PowerShell in the project root directory.
@@ -2568,7 +2220,6 @@ To reproduce the Grafana setup on another machine:
   ```powershell
   docker compose up -d grafana
   ```
->>>>>>> main
 
 - Open Grafana at http://localhost:3001.
 
@@ -2584,30 +2235,6 @@ The .env file contains local credentials and must not be committed to Git.
 
 ## Control Logic Docker Container Setup
 ### Overview
-<<<<<<< HEAD
-The IoT Control Logic service has been containerized using Docker.
-
-The container runs Control_Logic.py, which connects to the
-
-MQTT broker, retrieves sensor data from PostgreSQL and
-
-evaluates whether actuator commands are required.
-
-### Prerequisites
-Before running the Control Logic container, ensure:
-
-- Docker Desktop is installed and running.
-
-- PostgreSQL is running locally on port 5434.
-
-- The IoT telemetry database has been set up.
-
-- Mosquitto MQTT broker is running on port 1883.
-
-- Prototype/.env contains the required database credentials.
-
-### Docker Configuration
-=======
 
 The IoT Control Logic service has been containerized using Docker.
 
@@ -2627,45 +2254,11 @@ Before running the Control Logic container, ensure:
 
 ### Docker Configuration
 
->>>>>>> main
 The Dockerfile is located at:
 
 Prototype/Dockerfile.control
 
 The Control Logic service is configured in the root
-<<<<<<< HEAD
-
-docker-compose.yml file.
-
-The container uses host.docker.internal to communicate
-
-with PostgreSQL and MQTT running on the host machine.
-
-### Environment Variables
-| Variable | Description |
-
-| --- | --- |
-
-| MQTT_BROKER | MQTT broker hostname |
-
-| MQTT_PORT | MQTT broker port |
-
-| DB_HOST | PostgreSQL hostname |
-
-| DB_PORT | PostgreSQL port |
-
-| DB_NAME | Database name |
-
-| DB_USER | Database username |
-
-| DB_PASSWORD | Database password |
-
-The database password is loaded from Prototype/.env.
-
-This file must not be committed to Git.
-
-### Building and Running the Control Logic Container
-=======
 docker-compose.yml file.
 
 The container uses host.docker.internal to communicate
@@ -2689,7 +2282,6 @@ This file must not be committed to Git.
 
 ### Building and Running the Control Logic Container
 
->>>>>>> main
 Open PowerShell in the project root directory.
 
 Make sure Docker Desktop, PostgreSQL and the Mosquitto MQTT broker are running.
@@ -2697,37 +2289,19 @@ Make sure Docker Desktop, PostgreSQL and the Mosquitto MQTT broker are running.
 **1. Validate the Docker Compose configuration:**
 
 ```powershell
-<<<<<<< HEAD
-
 docker compose --env-file ./Prototype/.env config --quiet
-
-=======
-docker compose --env-file ./Prototype/.env config --quiet
->>>>>>> main
 ```
 
 **2. Build the Control Logic Docker image:**
 
 ```powershell
-<<<<<<< HEAD
-
 docker compose --env-file ./Prototype/.env build control-logic
-
-=======
-docker compose --env-file ./Prototype/.env build control-logic
->>>>>>> main
 ```
 
 **3. Run the Control Logic container:**
 
 ```powershell
-<<<<<<< HEAD
-
 docker compose --env-file ./Prototype/.env run --rm --no-deps control-logic
-
-=======
-docker compose --env-file ./Prototype/.env run --rm --no-deps control-logic
->>>>>>> main
 ```
 
 The container connects to the MQTT broker and PostgreSQL database.
@@ -2737,52 +2311,27 @@ It retrieves the latest sensor reading, evaluates the control rules and publishe
 The current startup process checks the latest database reading and then exits. It does not continuously listen for incoming MQTT sensor readings.
 
 ### Running the Actuator Simulator
-<<<<<<< HEAD
-Open a separate PowerShell terminal and run:
-
-```powershell
-
-python .\Prototype\Actuator_Simulator.py
-
-=======
 
 Open a separate PowerShell terminal and run:
 
 ```powershell
 python .\Prototype\Actuator_Simulator.py
->>>>>>> main
 ```
 
 The Actuator Simulator subscribes to the `actuators/commands` MQTT topic and waits for commands.
 
-<<<<<<< HEAD
-### Testing and Verification
-=======
 
 ### Testing and Verification
 
->>>>>>> main
 The Control Logic container was tested successfully using Docker Compose.
 
 The following tests were completed:
 
 - Docker image built successfully.
-<<<<<<< HEAD
-
-- Container connected to the MQTT broker on port 1883.
-
-- Container connected to PostgreSQL on port 5434.
-
-- Latest sensor reading retrieved successfully from PostgreSQL.
-
-- Control rules evaluated successfully.
-
-=======
 - Container connected to the MQTT broker on port 1883.
 - Container connected to PostgreSQL on port 5434.
 - Latest sensor reading retrieved successfully from PostgreSQL.
 - Control rules evaluated successfully.
->>>>>>> main
 - Actuator Simulator received MQTT commands.
 
 **Control Logic Integration Test**
@@ -2794,25 +2343,11 @@ The Control Logic correctly detected the high temperature and published a fan ON
 The Actuator Simulator received the command and displayed:
 
 ```text
-<<<<<<< HEAD
-
-Actuator command received:
-
-Actuator: fan
-
-Action: ON
-
-Reason: High temperature detected
-
-Simulated Fan: ON
-
-=======
 Actuator command received:
 Actuator: fan
 Action: ON
 Reason: High temperature detected
 Simulated Fan: ON
->>>>>>> main
 ```
 
 This confirmed successful communication between the Dockerized Control Logic, MQTT broker and Actuator Simulator.
@@ -2820,19 +2355,6 @@ This confirmed successful communication between the Dockerized Control Logic, MQ
 The simulated reading was used for testing without modifying the PostgreSQL database.
 
 ### Troubleshooting
-<<<<<<< HEAD
-- **Docker not responding:** Check that Docker Desktop is running and its engine has started.
-
-- **MQTT connection failed:** Check that Mosquitto is running on port 1883.
-
-- **PostgreSQL connection failed:** Check port 5434 and the database credentials in `Prototype/.env`.
-
-- **Code changes not appearing:** Rebuild the Control Logic Docker image.
-
-- **Grafana password warning:** Configure `GF_DATASOURCE_PASSWORD` if required for the Grafana setup.
-
-### Current Limitations
-=======
 
 - **Docker not responding:** Check that Docker Desktop is running and its engine has started.
 - **MQTT connection failed:** Check that Mosquitto is running on port 1883.
@@ -2842,41 +2364,17 @@ The simulated reading was used for testing without modifying the PostgreSQL data
 
 ### Current Limitations
 
->>>>>>> main
 The current Control Logic startup retrieves and evaluates the latest PostgreSQL sensor reading, then exits.
 
 Continuous MQTT sensor subscriptions are not enabled in the current startup function. This requires further integration work.
 
 ## Sensor and Actuator Simulator Docker Setup
-<<<<<<< HEAD
-=======
 
->>>>>>> main
 The Sensor Simulator and Actuator Simulator have been containerized using Docker.
 
 Both services connect to the local Mosquitto MQTT broker using `host.docker.internal:1883`.
 
 ### Prerequisites
-<<<<<<< HEAD
-- Docker Desktop running
-
-- Mosquitto MQTT broker running on port 1883
-
-- `Prototype/.env` configured
-
-### Build the containers
-```powershell
-
-docker compose --env-file ./Prototype/.env build sensor-simulator actuator-simulator
-
-```
-
-### Run the Sensor Simulator
-```powershell
-
-docker compose --env-file ./Prototype/.env run --rm --no-deps sensor-simulator
-
-=======
 
 - Docker Desktop running
 - Mosquitto MQTT broker running on port 1883
@@ -2892,709 +2390,19 @@ docker compose --env-file ./Prototype/.env build sensor-simulator actuator-simul
 
 ```powershell
 docker compose --env-file ./Prototype/.env run --rm --no-deps sensor-simulator
->>>>>>> main
 ```
 
 The Sensor Simulator reads the IoT telemetry CSV dataset and publishes 10 JSON readings to the `sensors/telemetry` MQTT topic.
 
 ### Run the Actuator Simulator
-<<<<<<< HEAD
-```powershell
-
-docker compose --env-file ./Prototype/.env run --rm --no-deps actuator-simulator
-
-=======
 
 ```powershell
 docker compose --env-file ./Prototype/.env run --rm --no-deps actuator-simulator
->>>>>>> main
 ```
 
 The Actuator Simulator subscribes to `actuators/commands` and continuously listens for commands from the Control Logic.
 
 ### Testing
-<<<<<<< HEAD
-Both containers were built and tested successfully.
-
-- Sensor Simulator connected to MQTT and published 10 readings.
-
-- Actuator Simulator connected to MQTT and subscribed to `actuators/commands`.
-
-- A test command was published to MQTT.
-
-- Actuator Simulator received the command and simulated switching the fan ON.
-
-The complete sensor-to-control-to-actuator pipeline still requires integration testing.
-
----
-
-# Telemetry HTTP API — additional reference from the original README
-
-The following section consolidates the original root README. It documents the telemetry CRUD API, PostgreSQL schema, setup, network options, error handling and development practices. Some paths, versions, branches and environment values describe the original development setup; verify them against the checked-out code and current deployment before use. Do not expose PostgreSQL directly to the public internet.
-
-## IoT Telemetry API — original README reference
-HTTP API that exposes the `iot_telemetry_data` table in PostgreSQL so the
-
-front-end interface can read and modify telemetry records.
-
-Built with FastAPI, psycopg 3, and Pydantic.
-
-Each developer runs their own copy of the stack. The API and Postgres do
-
-not need to be on the same network as the rest of the team. See section
-
-9.4 if you're not on the same LAN as whoever is hosting the database.
-
-\> Troubleshooting errors encountered during development are documented
-
-\> separately in Jira under the API workstream. If something breaks, check
-
-\> there first before pinging the team.
-
----
-
-## 1. What this API does
-It sits between the PostgreSQL database and the front-end interface.
-
-    Front-end  ->  API (this folder)  ->  PostgreSQL
-
-    (teammate)     (you, now)             (iot_telemetry_data table)
-
-The front-end calls HTTP endpoints. This API translates those calls into SQL
-
-and returns JSON.
-
-Five endpoints:
-
-| Method | Path                    | Purpose                                |
-
-|--------|-------------------------|----------------------------------------|
-
-| GET    | /telemetry              | List rows (query: limit, offset)       |
-
-| GET    | /telemetry/{record_id}  | Fetch one row by records id            |
-
-| POST   | /telemetry              | Insert a new row                       |
-
-| PUT    | /telemetry/{record_id}  | Update specific fields on a row        |
-
-| DELETE | /telemetry/{record_id}  | Delete a row                           |
-
----
-
-## 2. Project layout
-    Prototype/
-
-    ├── .env                    <- DB credentials (gitignored, NOT committed)
-
-    ├── .gitignore              <- ignores .env
-
-    ├── requirements.txt        <- Python dependencies
-
-    ├── Data_Sensor.py          <- MQTT publisher (separate workstream)
-
-    └── api/
-
-        ├── __init__.py
-
-        ├── config.py           <- reads .env, builds DATABASE_URL
-
-        ├── db.py               <- connection pool, get_connection()
-
-        ├── models.py           <- Pydantic schemas (shape of a row)
-
-        ├── routes.py           <- the five HTTP endpoints
-
-        ├── errors.py           <- JSON error handlers for DB failures
-
-        └── main.py             <- FastAPI app entry point
-
----
-
-## 3. Setup — for teammates cloning the repo
-### 3.1 Install Python 3.12 or newer
-Python 3.11 will NOT work. The uvicorn version pulled in by the current
-
-requirements file imports `typing.NotRequired`, which only exists from
-
-Python 3.12 onward.
-
-Install Python 3.13 (matches the machines we tested on):
-
-    winget install --id Python.Python.3.13
-
-Close every PowerShell/VS Code window afterwards and open a new one. Then:
-
-    python --version      # should print Python 3.13.x
-
-### 3.2 Clone the repo
-    git clone https://github.com/D00281102/Devops_Group_Project.git
-
-Then switch to your branch:
-
-    git checkout Jo          # or Bright / Daniils / Simon — use your own
-
-Branch names are case-sensitive.
-
-### 3.3 Install the packages
-From the repo root:
-
-    pip install -r Prototype/requirements.txt
-
-Or manually:
-
-    pip install fastapi uvicorn "psycopg[binary]" python-dotenv psycopg_pool
-
-### 3.4 Create your own `.env`
-`.env` is gitignored on purpose — every machine has its own copy with its own
-
-DB values. Create `Prototype/.env` with:
-
-    DB_HOST=localhost
-
-    DB_PORT=5434
-
-    DB_NAME=postgres
-
-    DB_USER=postgres
-
-    DB_PASSWORD=\<your postgres password>
-
-Notes:
-
-- `DB_HOST=localhost` if Postgres is on the same machine.
-
-- `DB_HOST=192.168.1.6` if Postgres is on the other laptop on the network.
-
-- `DB_NAME` must be the database that actually contains the
-
-  `iot_telemetry_data` table. On our setup that's `postgres`.
-
-### 3.5 Check Postgres is reachable
-    psql -U postgres -h localhost -p 5434 -l
-
-Should list databases. If `psql` isn't on PATH:
-
-    & "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -h localhost -p 5434 -l
-
-Verify the table exists:
-
-    psql -U postgres -h localhost -p 5434 -d postgres -c "\dt"
-
-You should see `iot_telemetry_data` in the list.
-
-If the table isn't there and you're on your own machine, see section 9.4
-
-Option A for how to create it and load the CSV.
-
----
-
-## 4. Running the API
-From the `Prototype` folder:
-
-    python -m uvicorn api.main:app --reload
-
-You must be in `Prototype`, not the repo root — the import path
-
-`api.main:app` resolves relative to the current directory.
-
-You should see:
-
-    INFO:     Uvicorn running on http://127.0.0.1:8000
-
-    INFO:     Application startup complete.
-
-No traceback, no "pool" errors = good.
-
-### 4.1 Interactive API docs (free, auto-generated)
-Open in a browser:
-
-    http://127.0.0.1:8000/docs      <- Swagger UI (test requests here)
-
-    http://127.0.0.1:8000/redoc     <- ReDoc (nice to read)
-
-Use Swagger for testing. Click any endpoint, click **Try it out**, paste a
-
-body, click **Execute**. It handles JSON formatting for you — do NOT try to
-
-run the bash-style curl command that Swagger shows at the bottom.
-
----
-
-## 5. Testing the endpoints
-### Health check
-    curl.exe http://127.0.0.1:8000/
-
-Should return `{"status":"ok"}`.
-
-### List rows
-    curl.exe "http://127.0.0.1:8000/telemetry?limit=3"
-
-Returns an array of row objects.
-
-### Fetch one row
-    curl.exe "http://127.0.0.1:8000/telemetry/1"
-
-Returns a single object.
-
-### POST / PUT / DELETE
-Use the Swagger page at `/docs` — PowerShell mangles the quotes in a curl
-
-JSON body. Or use `curl.exe` with a JSON file:
-
-    curl.exe -X POST "http://127.0.0.1:8000/telemetry" ^
-
-      -H "Content-Type: application/json" ^
-
-      --data-binary "@body.json"
-
-where `body.json` contains the JSON payload.
-
----
-
-## 6. Configuration reference
-Read from `Prototype/.env` by `api/config.py`:
-
-| Variable    | Default     | Meaning                                       |
-
-|-------------|-------------|-----------------------------------------------|
-
-| DB_HOST     | localhost   | Postgres hostname or IP                       |
-
-| DB_PORT     | 5434        | Postgres port                                 |
-
-| DB_NAME     | postgres    | Database containing iot_telemetry_data        |
-
-| DB_USER     | postgres    | Postgres user                                 |
-
-| DB_PASSWORD | ""          | Postgres password (required)                  |
-
-These are combined into a `DATABASE_URL` of the form:
-
-    postgresql://USER:PASSWORD\@HOST:PORT/DB_NAME
-
-which the connection pool in `api/db.py` uses.
-
----
-
-## 7. Error responses
-All errors return JSON in the shape:
-
-    {"detail": "...", "error": "..."}   (for DB errors)
-
-    {"detail": "..."}                    (for validation / not-found)
-
-| Status | When it happens                                     |
-
-|--------|-----------------------------------------------------|
-
-| 400    | PUT with an empty body (no fields to update)        |
-
-| 404    | record_id doesn't exist in the table                |
-
-| 409    | DB constraint violated (e.g. NOT NULL, wrong type)  |
-
-| 422    | Request body failed validation (FastAPI auto)       |
-
-| 503    | Database unreachable (pool couldn't connect)        |
-
-The 422 responses come from FastAPI/Pydantic automatically — you don't need
-
-to raise them yourself. The 503 and 409 come from `api/errors.py`.
-
----
-
-## 8. Architecture notes — why it's built this way
-### Connection pool, not one connection per request
-`api/db.py` creates a single `ConnectionPool` at import time. Every request
-
-borrows a connection and returns it when done. This avoids the cost of
-
-opening a fresh TCP+auth connection for every request. Standard pattern for
-
-web servers.
-
-### Three separate Pydantic models
-- `TelemetryRow` — what the API returns (includes `records`).
-
-- `TelemetryCreate` — what the client sends for POST (no `records`; the DB
-
-  generates it).
-
-- `TelemetryUpdate` — all fields optional, defaults to `None`. Used with
-
-  `model_dump(exclude_unset=True)` so PUT only updates the fields the client
-
-  actually sent. Sending `{"temp": 25}` leaves everything else alone.
-
-### `conn.commit()` is required
-psycopg does not auto-commit. Any INSERT/UPDATE/DELETE must call
-
-`conn.commit()` inside the connection block, or the change rolls back when
-
-the connection returns to the pool.
-
-### Parameterised SQL only
-Every query uses `%s` placeholders and passes values as a tuple. The one
-
-exception is the PUT route, which builds `SET col = %s, ...` from the keys
-
-of a Pydantic model — those keys come from our code, not user input, so
-
-they're safe. The values are still parameterised.
-
----
-
-## 9. Network setup — if Postgres is on another machine
-This section only applies if you're trying to reach the team's Postgres
-
-over a network. If you're running your own Postgres locally, go straight to
-
-section 9.4 Option A and ignore 9.1–9.3.
-
-If the API runs on machine A and Postgres runs on machine B, three things
-
-must be true on machine B (the Postgres machine):
-
-### 9.1 `postgresql.conf` — allow external connections
-`C:\Program Files\PostgreSQL\17\data\postgresql.conf`
-
-Set:
-
-    listen_addresses = '*'
-
-(Remove the `#` at the start of the line.)
-
-To check it's already listening externally:
-
-    Get-NetTCPConnection -State Listen | Where-Object {$_.LocalPort -eq 5434}
-
-If LocalAddress shows `0.0.0.0`, it's already accepting external connections.
-
-### 9.2 `pg_hba.conf` — allow your network range
-`C:\Program Files\PostgreSQL\17\data\pg_hba.conf`
-
-Add as the **last line** of the file:
-
-    host    all    all    192.168.1.0/24    scram-sha-256
-
-Change `192.168.1.0/24` to match your network. Rules are matched top-down,
-
-first match wins, so this line catches everything the localhost rules don't.
-
-Edit with Notepad run as Administrator (right-click Notepad → Run as admin).
-
-### 9.3 Windows Firewall — open the port
-In an Administrator PowerShell on the Postgres machine:
-
-    New-NetFirewallRule -DisplayName "Postgres 5434" -Direction Inbound -Protocol TCP -LocalPort 5434 -Action Allow
-
-Restart Postgres afterwards:
-
-    Restart-Service postgresql-x64-17
-
-Then on machine A, set `DB_HOST=\<B's IP>` in `.env`.
-
-### 9.4 If you are NOT on the same network as the Postgres machine
-Everything in 9.1–9.3 only works when both machines are on the same LAN
-
-(same Wi-Fi, same home network). If your machine is somewhere else —
-
-different house, college network, mobile hotspot — the connection will time
-
-out no matter how Postgres is configured.
-
-**Before you read any further**: Option A below sets up a completely fresh,
-
-independent stack on your own machine. If you take that route, everything
-
-you already did in sections 3.1–3.3 still applies (Python, clone, packages).
-
-Section 3.4 onwards changes, because you'll be pointing at your own
-
-database, not the team's. Work through section 9.4 Option A and then come
-
-back to section 4 to run the API.
-
-You have three options. Pick the one that fits.
-
-**Option A — Load the CSV into your own local Postgres (recommended)**
-
-This is the cleanest option. You don't need anyone else's machine.
-
-1. Install Postgres on your own machine (port 5434 to match the team setup,
-
-   or whatever you want — you control it).
-
-2. Get the CSV file. It's `iot_telemetry_data.csv` and should be in the
-
-   repo, under `Prototype/data/`. If it's not there, ask the team.
-
-3. Create the table. In psql:
-
-       psql -U postgres -h localhost -p 5434 -d postgres
-
-   Then paste:
-
-       CREATE TABLE iot_telemetry_data (
-
-           records  SERIAL PRIMARY KEY,
-
-           ts       DOUBLE PRECISION NOT NULL,
-
-           device   TEXT NOT NULL,
-
-           co       DOUBLE PRECISION NOT NULL,
-
-           humidity DOUBLE PRECISION NOT NULL,
-
-           light    BOOLEAN NOT NULL,
-
-           lpg      DOUBLE PRECISION NOT NULL,
-
-           motion   BOOLEAN NOT NULL,
-
-           smoke    DOUBLE PRECISION NOT NULL,
-
-           temp     DOUBLE PRECISION NOT NULL
-
-       );
-
-   (If a teammate already has this table, run `\d iot_telemetry_data` on
-
-   their machine to get the exact column types and match them. Mismatched
-
-   types cause confusing errors later.)
-
-4. Load the CSV. Easiest way is pgAdmin:
-
-   - Open pgAdmin, connect to your local server.
-
-   - Right-click `iot_telemetry_data` → **Import/Export Data**.
-
-   - Mode: Import. Filename: point at the CSV. Format: csv. Header: Yes.
-
-   - Columns: match the CSV's column order to the table's columns.
-
-   - Click OK.
-
-   Or from psql (faster if you're comfortable):
-
-       \copy iot_telemetry_data (ts, device, co, humidity, light, lpg, motion, smoke, temp) FROM 'C:/path/to/iot_telemetry_data.csv' WITH (FORMAT csv, HEADER true);
-
-   Note: `\copy` needs forward slashes even on Windows.
-
-5. Set your `.env`:
-
-       DB_HOST=localhost
-
-       DB_PORT=5434
-
-       DB_NAME=postgres
-
-       DB_USER=postgres
-
-       DB_PASSWORD=\<your own password>
-
-6. **Now go back to section 4** and start the API as normal. Everything from
-
-   section 4 onwards works exactly the same; it just talks to your own
-
-   database instead of the team's.
-
-You now have a fully independent dev environment. Nothing depends on anyone
-
-else's machine.
-
-**Option B — Run Postgres in Docker on your own machine**
-
-If you have Docker, this skips the Postgres installer entirely:
-
-    docker run --name iot-postgres -e POSTGRES_PASSWORD=yourpassword -p 5434:5432 -d postgres:17
-
-Then load the CSV into it the same way as Option A steps 3–4. `.env` stays
-
-as `DB_HOST=localhost`, `DB_PORT=5434`. Once your container is up, go back
-
-to section 4 to run the API.
-
-Your repo already has a `docker-compose.yml` — check whether it already
-
-defines a Postgres service before starting a separate container.
-
-**Option C — Tunnel to the Postgres machine**
-
-Only worth doing if you specifically need to see the same data everyone
-
-else sees, live. Tools like Tailscale or ngrok create a private network
-
-between machines across the internet. This adds setup and security
-
-considerations and isn't needed for development. Avoid unless you have a
-
-specific reason.
-
-**What NOT to do**
-
-Do not try to expose Postgres directly to the public internet by
-
-port-forwarding on your router. Postgres has no business being reachable
-
-from the open internet, and you'll get scanned and attacked within hours.
-
-If you need remote access, use a tunnel (Option C), never a port forward.
-
----
-
-## 10. What the front-end teammate needs to know
-- Base URL when running locally: `http://127.0.0.1:8000`
-
-- All responses are JSON.
-
-- Data shape: see `api/models.py`, or open `/docs` and look at the schemas.
-
-- Field names are exactly as in the table: `records`, `ts`, `device`, `co`,
-
-  `humidity`, `light`, `lpg`, `motion`, `smoke`, `temp`.
-
-- `light` and `motion` are booleans. Everything else numeric is a float
-
-  except `records` (integer) and `device` (string).
-
-- Pagination on the list endpoint: `?limit=100&offset=0`. Defaults are
-
-  100 and 0.
-
-- Errors: always check the HTTP status code. 4xx = your request, 5xx =
-
-  server/DB side. Body always has a `detail` field.
-
-- For testing the API without writing client code, use
-
-  `http://127.0.0.1:8000/docs`.
-
----
-
-## 11. Git workflow
-- Work on your own branch (`Jo`, `Bright`, `Daniils`, `Simon`, ...).
-
-- Push to your branch: `git push origin \<branch>`.
-
-- Do NOT push directly to `main` after this point.
-
-- To merge your work into `main`: open a Pull Request on GitHub, get it
-
-  reviewed, then merge.
-
-- Never commit `.env`. It's gitignored — if `git status` shows it, something
-
-  is wrong with `.gitignore`.
-
----
-
-## 12. Quick reference
-Start the server:
-
-    cd Prototype
-
-    python -m uvicorn api.main:app --reload
-
-Test in browser:
-
-    http://127.0.0.1:8000/docs
-
-Test in terminal:
-
-    curl.exe "http://127.0.0.1:8000/telemetry?limit=3"
-
-Stop the server:
-
-    Ctrl+C in the terminal running uvicorn
-
-List databases:
-
-    psql -U postgres -h localhost -p 5434 -l
-
-List tables in `postgres`:
-
-    psql -U postgres -h localhost -p 5434 -d postgres -c "\dt"
-
-View all telemetry rows directly in SQL:
-
-    psql -U postgres -h localhost -p 5434 -d postgres -c "SELECT * FROM iot_telemetry_data LIMIT 10;"
-
----
-
-# Historical Grafana Investigation and Test Evidence
-
-This section preserves the early Grafana investigation from the former `Grafana_README.md`. It describes historical tests, **not** the current provisioned dashboard. The current real-data Grafana instructions are in the Grafana Visualisation section above.
-
-## Initial Grafana container and TestData dashboard
-
-The initial image was `grafana/grafana:latest`, tested as Grafana 13.2.2, with container name `grafana` and host port 3000:
-
-```powershell
-docker run -d --name grafana -p 3000:3000 grafana/grafana:latest
-docker start grafana
-```
-
-The initial dashboard `IoT Sensor Data - Grafana Test` used Grafana's built-in TestData datasource and a `Sensor Data Time Series` panel. This established that Grafana could create and display time-series visualisations before connecting the project database. TestData was synthetic, not actual IoT telemetry.
-
-## Local PostgreSQL 17.11 test
-
-A separate local PostgreSQL 17.11 server was tested on `localhost:5432`. `Get-Service *postgres*` showed the service running, and `Test-NetConnection localhost -Port 5432` returned `TcpTestSucceeded : True`. The historical test used the `postgres` database and a local-only test credential; no password is reproduced here. The Grafana datasource used `host.docker.internal:5432`, username `postgres`, SSL disabled and PostgreSQL version 17. Grafana's Save & test returned `Database Connection OK`.
-
-The original test schema and data were:
-
-```sql
-CREATE TABLE dummy_sensor_data (
-    id SERIAL PRIMARY KEY,
-    ts TIMESTAMP NOT NULL,
-    device VARCHAR(50),
-    temp DOUBLE PRECISION,
-    humidity DOUBLE PRECISION,
-    light DOUBLE PRECISION,
-    co DOUBLE PRECISION,
-    lpg DOUBLE PRECISION,
-    motion BOOLEAN,
-    smoke DOUBLE PRECISION
-);
-
-INSERT INTO dummy_sensor_data
-(ts, device, temp, humidity, light, co, lpg, motion, smoke)
-VALUES
-('2026-09-29 14:00:00', 'sensor-01', 22.5, 48.2, 350, 0.4, 1.2, true, 0.1),
-('2026-09-29 14:05:00', 'sensor-01', 23.1, 49.0, 370, 0.5, 1.3, false, 0.1),
-('2026-09-29 14:10:00', 'sensor-01', 23.8, 50.1, 390, 0.5, 1.4, true, 0.2),
-('2026-09-29 14:15:00', 'sensor-01', 24.2, 51.3, 410, 0.6, 1.5, false, 0.2),
-('2026-09-29 14:20:00', 'sensor-01', 24.8, 52.0, 430, 0.7, 1.6, true, 0.3);
-
-SELECT * FROM dummy_sensor_data ORDER BY ts;
-SELECT ts AS "time", temp FROM dummy_sensor_data ORDER BY ts;
-```
-
-PostgreSQL returned `INSERT 0 5`. The query retrieved five rows and Grafana displayed temperatures rising from 22.5 to 24.8. The `IoT Sensor Data Dashboard` dashboard with `Temperature Readings` panel was saved, refreshed and verified to persist. This historical test database/table is separate from the current real-data `iot_telemetry_data` setup.
-
-# Legacy Control Settings API (historical reference)
-
-The original FastAPI Control Settings API used `http://127.0.0.1:8000`, with interactive Swagger documentation at `http://127.0.0.1:8000/docs`. From the repository root, its original development command was:
-
-```powershell
-python -m uvicorn api.main:app --app-dir Prototype --reload
-```
-
-The original endpoints were `GET /control-settings` (retrieve persisted settings) and `PUT /control-settings` (update them). Both returned HTTP 200 and the JSON structure:
-
-```json
-{
-  "temperature_threshold": 30,
-  "humidity_threshold": 75,
-  "light_enabled": true
-}
-```
-
-These values are examples, not defaults. The original defaults were 25 degrees Celsius, 70% humidity and `light_enabled: true`. The accepted temperature range was -50 to 100 degrees Celsius; humidity range 0 to 100%; invalid values returned 422. Settings persisted in PostgreSQL `control_settings`. **Important:** SCRUM-122's 2 November 2026 report states the legacy control-settings endpoints were disabled in SCRUM-121 and frontend migration was outstanding. Do not assume these endpoints are active in the current version.
-=======
 
 Both containers were built and tested successfully.
 
@@ -3604,4 +2412,3 @@ Both containers were built and tested successfully.
 - Actuator Simulator received the command and simulated switching the fan ON.
 
 The complete sensor-to-control-to-actuator pipeline still requires integration testing.
->>>>>>> main

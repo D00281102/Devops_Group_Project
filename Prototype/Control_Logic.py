@@ -269,17 +269,10 @@ def on_connect(client, userdata, flags, reason_code, properties):
     """
     if reason_code == 0:
         print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-<<<<<<< HEAD
-        print("Actuator commands will be published to building-specific MQTT topics.")
-
-        # Sensor telemetry is now consumed through Kafka.
-        print(f"Sensor telemetry source: Kafka topic {KAFKA_TOPIC}")
-=======
         print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
 
         client.subscribe(SENSOR_TOPIC)
         print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
->>>>>>> main
     else:
         print(f"MQTT connection failed: {reason_code}")
 
@@ -364,25 +357,7 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-<<<<<<< HEAD
-
-        # Find which building sent this sensor reading.
-        building_id = get_building_id(sensor_data.get("device"))
-
-        if building_id is None:
-            print("Unknown sensor device. Skipping control decisions.")
-            return
-
-        # Apply the settings for this building.
-        settings = get_control_settings(building_id)
-
-        if settings is None:
-            print(f"No control settings found for Building {building_id}. Skipping.")
-            return
-
-=======
         settings = get_control_settings()
->>>>>>> main
         commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
@@ -401,17 +376,8 @@ def on_message(client, userdata, message):
 
         print()
 
-<<<<<<< HEAD
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        print("Error: Received message is not valid JSON.")
-    except (psycopg.Error, RuntimeError) as error:
-        print(f"Database error: {error}. Skipping sensor reading.")
-    except (KeyError, TypeError, ValueError) as error:
-        print(f"Invalid sensor reading: {error}. Skipping.")
-=======
     except json.JSONDecodeError:
             print("Error: Received message is not valid JSON.")
->>>>>>> main
 
 def start_control_logic():
     """
@@ -428,8 +394,6 @@ def start_control_logic():
 
     try:
         client.loop_start()
-<<<<<<< HEAD
-=======
 
         print("Retrieving latest sensor reading from database...\n")
         process_database_data(client)
@@ -448,7 +412,6 @@ def start_control_logic():
         client.loop_stop()
         client.disconnect()
         pool.close()
->>>>>>> main
 
         # Historical telemetry lookup is optional for Kafka mode.
         if os.getenv('PROCESS_HISTORICAL_TELEMETRY', 'false').lower() == 'true':
