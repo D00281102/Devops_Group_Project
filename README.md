@@ -573,7 +573,17 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 
 ---
 
-## 12. Quick reference
+## 12. Continuous integration
+
+GitHub Actions runs the database-free Python checks on every branch push and
+pull request. After they pass, it builds the API, Control Logic, Sensor
+Simulator, and Actuator Simulator Docker images without publishing them.
+Database-backed tests are not included because they currently require an
+interactive password or a separately seeded test database.
+
+---
+
+## 13. Quick reference
 
 Start the server:
 
