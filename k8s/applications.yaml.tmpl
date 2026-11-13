@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iot-app-config
+  namespace: iot-app
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: postgres
+  DB_USER: postgres
+  CONTROL_DB_HOST: postgres
+  CONTROL_DB_PORT: "5432"
+  CONTROL_DB_NAME: control_settings_db
+  CONTROL_DB_USER: postgres
+  AUTH_DB_HOST: postgres
+  AUTH_DB_PORT: "5432"
+  AUTH_DB_NAME: control_settings_db
+  AUTH_DB_USER: postgres
+  MQTT_BROKER: mosquitto
+  MQTT_PORT: "1883"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-api
+  namespace: iot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: control-api
+  template:
+    metadata:
+      labels:
+        app: control-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: control-api
+          image: ghcr.io/__IMAGE_OWNER__/devops-group-project-control-api:__IMAGE_TAG__
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: iot-app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: DB_PASSWORD
+            - name: CONTROL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: DB_PASSWORD
+            - name: AUTH_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: DB_PASSWORD
+            - name: AUTH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: AUTH_SECRET_KEY
+          readinessProbe:
+            httpGet:
+              path: /telemetry/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-api
+  namespace: iot-app
+spec:
+  selector:
+    app: control-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-logic
+  namespace: iot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: control-logic
+  template:
+    metadata:
+      labels:
+        app: control-logic
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: control-logic
+          image: ghcr.io/__IMAGE_OWNER__/devops-group-project-control-logic:__IMAGE_TAG__
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: iot-app-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: DB_PASSWORD
+            - name: CONTROL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: iot-app-secrets
+                  key: DB_PASSWORD

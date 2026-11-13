@@ -577,7 +577,12 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 
 GitHub Actions runs the database-free Python checks on every branch push and
 pull request. After they pass, it builds the API, Control Logic, Sensor
-Simulator, and Actuator Simulator Docker images without publishing them.
+Simulator, and Actuator Simulator Docker images. Builds on the repository's
+`main` branch are published to GitHub Container Registry (GHCR). Kubernetes
+deployment is a later job that runs only when `K8S_DEPLOY_ENABLED` is set to
+`true` in repository variables. See [k8s/README.md](k8s/README.md) for cluster
+prerequisites and setup.
+
 Database-backed tests are not included because they currently require an
 interactive password or a separately seeded test database.
 
