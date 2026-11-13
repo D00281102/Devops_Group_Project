@@ -171,16 +171,115 @@ def process_database_data(client):
     else:
         print("Control decision: No action required")
 
+def get_control_settings():
+    """
+    Retrieve the saved control settings from PostgreSQL.
+    """
+    with get_control_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT temperature_threshold, humidity_threshold, light_enabled
+                FROM control_settings
+                WHERE id = 1
+                """
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        return {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
+
+    return {
+        "temperature_threshold": row[0],
+        "humidity_threshold": row[1],
+        "light_enabled": row[2]
+    }
+
+def get_latest_sensor_data():
+    """
+    Retrieve the latest sensor reading from the PostgreSQL database.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT records, ts, device, co, humidity, light,
+                       lpg, motion, smoke, temp
+                FROM iot_telemetry_data
+                ORDER BY records DESC
+                LIMIT 1
+                """
+            )
+
+            row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "records": row[0],
+        "ts": row[1],
+        "device": row[2],
+        "co": row[3],
+        "humidity": row[4],
+        "light": row[5],
+        "lpg": row[6],
+        "motion": row[7],
+        "smoke": row[8],
+        "temp": row[9]
+    }
+
+def process_database_data(client):
+    """
+    Retrieve the latest sensor reading from the database,
+    evaluate it and publish any required actuator commands.
+    """
+    sensor_data = get_latest_sensor_data()
+
+    if sensor_data is None:
+        print("No sensor data found in database.")
+        return
+
+    print("Latest database sensor reading:")
+    print(json.dumps(sensor_data, indent=4))
+
+    settings = get_control_settings()
+    commands = evaluate_sensor_data(sensor_data, settings)
+
+    if commands:
+        print("Control decisions:")
+
+        for command in commands:
+            print(
+                f"- {command['actuator'].upper()} "
+                f"{command['action']} - {command['reason']}"
+            )
+
+            publish_actuator_command(client, command)
+    else:
+        print("Control decision: No action required")
+
 def on_connect(client, userdata, flags, reason_code, properties):
     """
     Connect to MQTT and subscribe to live sensor readings.
     """
     if reason_code == 0:
         print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
+<<<<<<< HEAD
         print("Actuator commands will be published to building-specific MQTT topics.")
 
         # Sensor telemetry is now consumed through Kafka.
         print(f"Sensor telemetry source: Kafka topic {KAFKA_TOPIC}")
+=======
+        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+
+        client.subscribe(SENSOR_TOPIC)
+        print(f"Subscribed to MQTT topic: {SENSOR_TOPIC}")
+>>>>>>> main
     else:
         print(f"MQTT connection failed: {reason_code}")
 
@@ -265,6 +364,7 @@ def on_message(client, userdata, message):
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
+<<<<<<< HEAD
 
         # Find which building sent this sensor reading.
         building_id = get_building_id(sensor_data.get("device"))
@@ -280,6 +380,9 @@ def on_message(client, userdata, message):
             print(f"No control settings found for Building {building_id}. Skipping.")
             return
 
+=======
+        settings = get_control_settings()
+>>>>>>> main
         commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
@@ -298,12 +401,17 @@ def on_message(client, userdata, message):
 
         print()
 
+<<<<<<< HEAD
     except (json.JSONDecodeError, UnicodeDecodeError):
         print("Error: Received message is not valid JSON.")
     except (psycopg.Error, RuntimeError) as error:
         print(f"Database error: {error}. Skipping sensor reading.")
     except (KeyError, TypeError, ValueError) as error:
         print(f"Invalid sensor reading: {error}. Skipping.")
+=======
+    except json.JSONDecodeError:
+            print("Error: Received message is not valid JSON.")
+>>>>>>> main
 
 def start_control_logic():
     """
@@ -320,6 +428,27 @@ def start_control_logic():
 
     try:
         client.loop_start()
+<<<<<<< HEAD
+=======
+
+        print("Retrieving latest sensor reading from database...\n")
+        process_database_data(client)
+
+        print(f"Listening for live sensor readings on: {SENSOR_TOPIC}")
+
+        # Keep the control logic running to receive MQTT messages.
+        while True:
+            import time
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("Stopping IoT control logic...")
+
+    finally:
+        client.loop_stop()
+        client.disconnect()
+        pool.close()
+>>>>>>> main
 
         # Historical telemetry lookup is optional for Kafka mode.
         if os.getenv('PROCESS_HISTORICAL_TELEMETRY', 'false').lower() == 'true':

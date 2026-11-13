@@ -364,6 +364,7 @@ Mosquitto
     |
     v
 Kafka Connect MQTT Source Connector
+<<<<<<< HEAD
     |
     v
 Kafka Topic: sensor-telemetry
@@ -373,6 +374,13 @@ Python Telemetry Consumer
     |
     v
 PostgreSQL: iot_telemetry_data
+=======
+     ↓ Kafka: sensor-telemetry
+Apache Kafka Broker (localhost:9092)
+     ↓
+Python database consumer
+     ↓ PostgreSQL: existing iot_telemetry_data table
+>>>>>>> main
 ```
 
 ## Kafka Components
@@ -387,7 +395,11 @@ The Docker-based setup uses:
 - Python Kafka consumer.
 - PostgreSQL database containing the `iot_telemetry_data` table.
 
+<<<<<<< HEAD
 The Kafka Connect service uses a custom Docker image built from `Dockerfile.kafka-connect`. This image installs the MQTT source connector automatically, so team members do not need to download and copy connector JAR files manually.
+=======
+Kafka broker, Kafka Connect, Mosquitto, the database consumer, and the sensor are separate processes. The database consumer uses the existing PostgreSQL database configured in `Prototype/.env`; it does not create a database.
+>>>>>>> main
 
 ## Environment Setup
 
@@ -444,7 +456,36 @@ The MQTT source connector uses the following configuration:
 - Kafka topic: `sensor-telemetry`
 - MQTT QoS: `0`
 
+<<<<<<< HEAD
 The hostname `mosquitto` is used because Kafka Connect communicates with Mosquitto through the Docker Compose network.
+=======
+### 5. Start the Database Consumer
+
+In the terminal named `database consumer`, from the `Prototype` folder:
+
+```powershell
+Set-Location "C:\Devops_Group_Project\Prototype"
+py -m scripts.database_consumer
+```
+
+The consumer reads JSON records from `sensor-telemetry`, validates the
+telemetry fields, and inserts them into the existing `iot_telemetry_data`
+table using the same `Prototype/.env` database settings as the API. Install
+the project dependencies first with `py -m pip install -r requirements.txt`.
+
+### 6. Start the Sensor
+
+In the terminal named `sensor`:
+
+```powershell
+Set-Location "C:\Devops_Group_Project"
+py .\Prototype\Data_Sensor.py
+```
+
+## Verify Kafka Connect
+
+Use a separate PowerShell terminal for these commands.
+>>>>>>> main
 
 Check that Kafka Connect is responding:
 
@@ -468,6 +509,7 @@ RUNNING
 
 The Python consumer is located at:
 
+<<<<<<< HEAD
 ```text
 Prototype/scripts/consumer.py
 ```
@@ -549,6 +591,13 @@ LIMIT 10;
 ```
 
 If records appear in the query results, the Kafka-to-PostgreSQL integration is working.
+=======
+- `mosquitto_sub` displays messages on `sensors/telemetry`.
+- The Kafka Connect connector reads those MQTT messages.
+- The database consumer inserts records from `sensor-telemetry` into the
+  configured PostgreSQL `iot_telemetry_data` table.
+- The original sensor JSON is forwarded as the Kafka record value.
+>>>>>>> main
 
 ## Troubleshooting
 
@@ -2061,14 +2110,22 @@ Actuator Simulator
 This demonstrates a working IoT control pipeline where simulated sensor data can automatically generate and execute simulated actuator actions.
 
 ---
+<<<<<<< HEAD
 
 ## Grafana Visualisation
 ## Overview
+=======
+## Grafana Visualisation
+
+## Overview
+
+>>>>>>> main
 Grafana is used to visualise the IoT sensor data stored in the project PostgreSQL database.
 
 The current local data flow is:
 
 ```text
+<<<<<<< HEAD
 
 IoT Telemetry Dataset
 
@@ -2088,12 +2145,24 @@ Grafana Dashboard
 
 Sensor Visualisation Panels
 ```
+=======
+IoT Telemetry Dataset
+        ↓
+PostgreSQL Database
+        ↓
+Grafana PostgreSQL Datasource
+        ↓
+Grafana Dashboard
+        ↓
+Sensor Visualisation Panels
+>>>>>>> main
 
 The sensor data is stored in the iot_telemetry_data table in PostgreSQL.
 
 The table contains the following sensor fields:
 
 ts - Timestamp
+<<<<<<< HEAD
 
 device - Device name
 
@@ -2109,6 +2178,15 @@ motion - Motion status
 
 smoke - Smoke reading
 
+=======
+device - Device name
+co - Carbon monoxide reading
+humidity - Humidity reading
+light - Light status
+lpg - LPG reading
+motion - Motion status
+smoke - Smoke reading
+>>>>>>> main
 temp - Temperature reading
 
 The dataset contains approximately 405,000 sensor readings.
@@ -2126,11 +2204,16 @@ The PostgreSQL database is running locally on port 5432.
 Grafana connects to PostgreSQL using the following settings:
 
 Host: host.docker.internal:5432
+<<<<<<< HEAD
 
 Database: postgres
 
 User: postgres
 
+=======
+Database: postgres
+User: postgres
+>>>>>>> main
 SSL Mode: disable
 
 The PostgreSQL password is not stored in this documentation.
@@ -2146,6 +2229,7 @@ The datasource was then used in Grafana Explore to confirm that real sensor data
 Example query:
 
 SELECT
+<<<<<<< HEAD
 
     to_timestamp(ts) AS "time",
 
@@ -2157,6 +2241,13 @@ ORDER BY ts
 
 LIMIT 100;
 
+=======
+    to_timestamp(ts) AS "time",
+    temp
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+>>>>>>> main
 Dashboard
 
 A Grafana dashboard called:
@@ -2168,6 +2259,7 @@ was created using the project sensor data.
 The dashboard contains the following visualisation panels:
 
 Humidity Readings
+<<<<<<< HEAD
 
 Temperature Readings
 
@@ -2179,6 +2271,13 @@ Smoke Readings
 
 Motion Readings
 
+=======
+Temperature Readings
+CO Readings
+LPG Readings
+Smoke Readings
+Motion Readings
+>>>>>>> main
 Light Readings
 
 The dashboard was tested using the real data stored in PostgreSQL.
@@ -2190,6 +2289,7 @@ The panels use the ts field as the time value and the relevant sensor field for 
 ## Example temperature query:
 
 ```sql
+<<<<<<< HEAD
 
 SELECT
 
@@ -2271,11 +2371,64 @@ ORDER BY ts
 
 LIMIT 100;
 
+=======
+SELECT
+    to_timestamp(ts) AS "time",
+    temp
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+```
+
+## Example humidity query:
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    humidity
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+```
+
+## Example CO query:
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    co
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+```
+
+## Example LPG query:
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    lpg
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+```
+
+## Example smoke query:
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    smoke
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+>>>>>>> main
 ```
 
 For the boolean sensor values, the same approach is used with the motion and light fields.
 
 ## Example motion query:
+<<<<<<< HEAD
 ```sql
 
 SELECT
@@ -2307,16 +2460,41 @@ ORDER BY ts
 
 LIMIT 100;
 
+=======
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    motion
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+```
+
+## Example light query:
+
+```sql
+SELECT
+    to_timestamp(ts) AS "time",
+    light
+FROM iot_telemetry_data
+ORDER BY ts
+LIMIT 100;
+>>>>>>> main
 ```
 
 ## Testing
 The datasource and dashboard are configured using the files in `Prototype/grafana/provisioning` and `Prototype/grafana/dashboards`. Grafana uses the `grafana-data` Docker volume to preserve its data when the container is recreated.
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
 The Grafana datasource was tested successfully against the local PostgreSQL database.
 
 The dashboard contains the following visualisation panels:
 
 - Humidity Readings
+<<<<<<< HEAD
 
 - Temperature Readings
 
@@ -2330,11 +2508,23 @@ The dashboard contains the following visualisation panels:
 
 - Current Light Status
 
+=======
+- Temperature Readings
+- CO Readings
+- LPG Readings
+- Smoke Readings
+- Current Motion Status
+- Current Light Status
+>>>>>>> main
 - Current Temperature
 
 The final dashboard was saved after removing duplicate panels.
 
 ## Reproducing the Grafana Setup
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
 To reproduce the Grafana setup on another machine:
 
 - Install Docker Desktop and make sure it is running.
@@ -2343,6 +2533,7 @@ To reproduce the Grafana setup on another machine:
 
 - In the project root directory, copy .env.example to .env.
 
+<<<<<<< HEAD
 - Open `.env` and configure the required environment variables using your local database credentials. This includes `DB_PASSWORD`, `GF_DATASOURCE_PASSWORD`, `AUTH_DB_HOST`, `AUTH_DB_PASSWORD` and `AUTH_SECRET_KEY`. Check the database settings and passwords for your local environment. Do not commit or share this file.
 
 - Open PowerShell in the project root directory.
@@ -2362,6 +2553,22 @@ To reproduce the Grafana setup on another machine:
   docker compose up -d grafana
 
   ```
+=======
+- Open .env and set GF_DATASOURCE_PASSWORD to the password for the local PostgreSQL user. Do not commit or share this file.
+
+- Open PowerShell in the project root directory.
+- Validate the Docker Compose configuration:
+
+  ```powershell
+  docker compose config --quiet
+  ```
+
+- Start Grafana:
+
+  ```powershell
+  docker compose up -d grafana
+  ```
+>>>>>>> main
 
 - Open Grafana at http://localhost:3001.
 
@@ -2377,6 +2584,7 @@ The .env file contains local credentials and must not be committed to Git.
 
 ## Control Logic Docker Container Setup
 ### Overview
+<<<<<<< HEAD
 The IoT Control Logic service has been containerized using Docker.
 
 The container runs Control_Logic.py, which connects to the
@@ -2399,11 +2607,33 @@ Before running the Control Logic container, ensure:
 - Prototype/.env contains the required database credentials.
 
 ### Docker Configuration
+=======
+
+The IoT Control Logic service has been containerized using Docker.
+
+The container runs Control_Logic.py, which connects to the
+MQTT broker, retrieves sensor data from PostgreSQL and
+evaluates whether actuator commands are required.
+
+### Prerequisites
+
+Before running the Control Logic container, ensure:
+
+- Docker Desktop is installed and running.
+- PostgreSQL is running locally on port 5434.
+- The IoT telemetry database has been set up.
+- Mosquitto MQTT broker is running on port 1883.
+- Prototype/.env contains the required database credentials.
+
+### Docker Configuration
+
+>>>>>>> main
 The Dockerfile is located at:
 
 Prototype/Dockerfile.control
 
 The Control Logic service is configured in the root
+<<<<<<< HEAD
 
 docker-compose.yml file.
 
@@ -2435,6 +2665,31 @@ The database password is loaded from Prototype/.env.
 This file must not be committed to Git.
 
 ### Building and Running the Control Logic Container
+=======
+docker-compose.yml file.
+
+The container uses host.docker.internal to communicate
+with PostgreSQL and MQTT running on the host machine.
+
+### Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| MQTT_BROKER | MQTT broker hostname |
+| MQTT_PORT | MQTT broker port |
+| DB_HOST | PostgreSQL hostname |
+| DB_PORT | PostgreSQL port |
+| DB_NAME | Database name |
+| DB_USER | Database username |
+| DB_PASSWORD | Database password |
+
+The database password is loaded from Prototype/.env.
+This file must not be committed to Git.
+
+
+### Building and Running the Control Logic Container
+
+>>>>>>> main
 Open PowerShell in the project root directory.
 
 Make sure Docker Desktop, PostgreSQL and the Mosquitto MQTT broker are running.
@@ -2442,25 +2697,37 @@ Make sure Docker Desktop, PostgreSQL and the Mosquitto MQTT broker are running.
 **1. Validate the Docker Compose configuration:**
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose --env-file ./Prototype/.env config --quiet
 
+=======
+docker compose --env-file ./Prototype/.env config --quiet
+>>>>>>> main
 ```
 
 **2. Build the Control Logic Docker image:**
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose --env-file ./Prototype/.env build control-logic
 
+=======
+docker compose --env-file ./Prototype/.env build control-logic
+>>>>>>> main
 ```
 
 **3. Run the Control Logic container:**
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose --env-file ./Prototype/.env run --rm --no-deps control-logic
 
+=======
+docker compose --env-file ./Prototype/.env run --rm --no-deps control-logic
+>>>>>>> main
 ```
 
 The container connects to the MQTT broker and PostgreSQL database.
@@ -2470,22 +2737,37 @@ It retrieves the latest sensor reading, evaluates the control rules and publishe
 The current startup process checks the latest database reading and then exits. It does not continuously listen for incoming MQTT sensor readings.
 
 ### Running the Actuator Simulator
+<<<<<<< HEAD
 Open a separate PowerShell terminal and run:
 
 ```powershell
 
 python .\Prototype\Actuator_Simulator.py
 
+=======
+
+Open a separate PowerShell terminal and run:
+
+```powershell
+python .\Prototype\Actuator_Simulator.py
+>>>>>>> main
 ```
 
 The Actuator Simulator subscribes to the `actuators/commands` MQTT topic and waits for commands.
 
+<<<<<<< HEAD
 ### Testing and Verification
+=======
+
+### Testing and Verification
+
+>>>>>>> main
 The Control Logic container was tested successfully using Docker Compose.
 
 The following tests were completed:
 
 - Docker image built successfully.
+<<<<<<< HEAD
 
 - Container connected to the MQTT broker on port 1883.
 
@@ -2495,6 +2777,12 @@ The following tests were completed:
 
 - Control rules evaluated successfully.
 
+=======
+- Container connected to the MQTT broker on port 1883.
+- Container connected to PostgreSQL on port 5434.
+- Latest sensor reading retrieved successfully from PostgreSQL.
+- Control rules evaluated successfully.
+>>>>>>> main
 - Actuator Simulator received MQTT commands.
 
 **Control Logic Integration Test**
@@ -2506,6 +2794,7 @@ The Control Logic correctly detected the high temperature and published a fan ON
 The Actuator Simulator received the command and displayed:
 
 ```text
+<<<<<<< HEAD
 
 Actuator command received:
 
@@ -2517,6 +2806,13 @@ Reason: High temperature detected
 
 Simulated Fan: ON
 
+=======
+Actuator command received:
+Actuator: fan
+Action: ON
+Reason: High temperature detected
+Simulated Fan: ON
+>>>>>>> main
 ```
 
 This confirmed successful communication between the Dockerized Control Logic, MQTT broker and Actuator Simulator.
@@ -2524,6 +2820,7 @@ This confirmed successful communication between the Dockerized Control Logic, MQ
 The simulated reading was used for testing without modifying the PostgreSQL database.
 
 ### Troubleshooting
+<<<<<<< HEAD
 - **Docker not responding:** Check that Docker Desktop is running and its engine has started.
 
 - **MQTT connection failed:** Check that Mosquitto is running on port 1883.
@@ -2535,16 +2832,32 @@ The simulated reading was used for testing without modifying the PostgreSQL data
 - **Grafana password warning:** Configure `GF_DATASOURCE_PASSWORD` if required for the Grafana setup.
 
 ### Current Limitations
+=======
+
+- **Docker not responding:** Check that Docker Desktop is running and its engine has started.
+- **MQTT connection failed:** Check that Mosquitto is running on port 1883.
+- **PostgreSQL connection failed:** Check port 5434 and the database credentials in `Prototype/.env`.
+- **Code changes not appearing:** Rebuild the Control Logic Docker image.
+- **Grafana password warning:** Configure `GF_DATASOURCE_PASSWORD` if required for the Grafana setup.
+
+### Current Limitations
+
+>>>>>>> main
 The current Control Logic startup retrieves and evaluates the latest PostgreSQL sensor reading, then exits.
 
 Continuous MQTT sensor subscriptions are not enabled in the current startup function. This requires further integration work.
 
 ## Sensor and Actuator Simulator Docker Setup
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
 The Sensor Simulator and Actuator Simulator have been containerized using Docker.
 
 Both services connect to the local Mosquitto MQTT broker using `host.docker.internal:1883`.
 
 ### Prerequisites
+<<<<<<< HEAD
 - Docker Desktop running
 
 - Mosquitto MQTT broker running on port 1883
@@ -2563,20 +2876,44 @@ docker compose --env-file ./Prototype/.env build sensor-simulator actuator-simul
 
 docker compose --env-file ./Prototype/.env run --rm --no-deps sensor-simulator
 
+=======
+
+- Docker Desktop running
+- Mosquitto MQTT broker running on port 1883
+- `Prototype/.env` configured
+
+### Build the containers
+
+```powershell
+docker compose --env-file ./Prototype/.env build sensor-simulator actuator-simulator
+```
+
+### Run the Sensor Simulator
+
+```powershell
+docker compose --env-file ./Prototype/.env run --rm --no-deps sensor-simulator
+>>>>>>> main
 ```
 
 The Sensor Simulator reads the IoT telemetry CSV dataset and publishes 10 JSON readings to the `sensors/telemetry` MQTT topic.
 
 ### Run the Actuator Simulator
+<<<<<<< HEAD
 ```powershell
 
 docker compose --env-file ./Prototype/.env run --rm --no-deps actuator-simulator
 
+=======
+
+```powershell
+docker compose --env-file ./Prototype/.env run --rm --no-deps actuator-simulator
+>>>>>>> main
 ```
 
 The Actuator Simulator subscribes to `actuators/commands` and continuously listens for commands from the Control Logic.
 
 ### Testing
+<<<<<<< HEAD
 Both containers were built and tested successfully.
 
 - Sensor Simulator connected to MQTT and published 10 readings.
@@ -3257,3 +3594,14 @@ The original endpoints were `GET /control-settings` (retrieve persisted settings
 ```
 
 These values are examples, not defaults. The original defaults were 25 degrees Celsius, 70% humidity and `light_enabled: true`. The accepted temperature range was -50 to 100 degrees Celsius; humidity range 0 to 100%; invalid values returned 422. Settings persisted in PostgreSQL `control_settings`. **Important:** SCRUM-122's 2 November 2026 report states the legacy control-settings endpoints were disabled in SCRUM-121 and frontend migration was outstanding. Do not assume these endpoints are active in the current version.
+=======
+
+Both containers were built and tested successfully.
+
+- Sensor Simulator connected to MQTT and published 10 readings.
+- Actuator Simulator connected to MQTT and subscribed to `actuators/commands`.
+- A test command was published to MQTT.
+- Actuator Simulator received the command and simulated switching the fan ON.
+
+The complete sensor-to-control-to-actuator pipeline still requires integration testing.
+>>>>>>> main

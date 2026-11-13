@@ -1,5 +1,6 @@
 # Containerised IoT and Kafka Setup
 
+<<<<<<< HEAD
 > **Purpose:** Docker Compose setup, MQTT/Kafka integration, control API, authentication, database design and multi-building test evidence. For Windows/Python manual development see [`local-setup.md`](local-setup.md).
 >
 > **Version note:** This guide preserves work from different development dates. Historical configuration must be checked against the current `docker-compose.yml`, API routes and SQL schema. Do not commit `.env` files, passwords or JWT signing secrets.
@@ -16,6 +17,18 @@
 This guide covers the project's Docker Compose setup, including Kafka, Kafka Connect, Kafka UI, Mosquitto MQTT, the Sensor Simulator, Control Logic, Actuator Simulator and Grafana.
 
 **Note:** The original Kafka setup instructions below describe the earlier Windows-based configuration, where Mosquitto and the Sensor Simulator ran outside Docker. These instructions are retained for reference and may not match the current Compose configuration.
+=======
+This guide covers the project's Docker Compose setup, including PostgreSQL
+with a persistent data volume, Kafka, Kafka Connect, Kafka UI, Mosquitto,
+the Sensor Simulator, Control Logic, Actuator Simulator, the Control API,
+and Grafana. The Windows-hosted Kafka consumer can also write telemetry to
+the PostgreSQL container through the published host port.
+
+**Note:** The Kafka section below includes the earlier Windows-based Kafka
+Connect plugin setup. The current Compose stack runs Mosquitto and the
+Sensor Simulator in Docker; Kafka Connect loads its MQTT plugin from the
+configured host plugin directory.
+>>>>>>> main
 
 For the current containerised Sensor Simulator, Control Logic, Actuator Simulator and Mosquitto setup, see **Dockerised IoT Control System — SCRUM-102** further down this document.
 
@@ -23,6 +36,7 @@ For the original manual Windows setup, see [local-setup.md](local-setup.md).
 
 ## Architecture
 ```text
+<<<<<<< HEAD
 
 Data_Sensor.py
 
@@ -40,6 +54,16 @@ Mosquitto on Windows
 
     v
 
+=======
+Sensor Simulator (Docker) or Data_Sensor.py (Windows)
+    |
+    | MQTT: mosquitto:1883 (Docker) or localhost:1883 (Windows)
+    v
+Mosquitto in Docker
+    |
+    | MQTT source connector via host.docker.internal:1883
+    v
+>>>>>>> main
 Kafka Connect in Docker
 
     |
@@ -49,6 +73,7 @@ Kafka Connect in Docker
     v
 
 Kafka in Docker
+<<<<<<< HEAD
 
     |
 
@@ -58,6 +83,16 @@ Kafka in Docker
 
     +--> Kafka consumer on Windows
 
+=======
+    |
+    +--> Kafka UI in Docker: http://localhost:8081
+    |
+    +--> Database consumer on Windows
+              |
+              v
+        PostgreSQL in Docker
+        (`iot_telemetry_data`, persistent volume)
+>>>>>>> main
 ```
 
 ## Prerequisites
@@ -66,12 +101,16 @@ Install and start:
 - Docker Desktop
 
 - Python 3
+<<<<<<< HEAD
 
 - Eclipse Mosquitto installed at `C:\Program Files\mosquitto`
 
+=======
+>>>>>>> main
 - Apache Kafka tools installed at `C:\kafka`
 
-Mosquitto does not need to be started manually. The project startup script starts it automatically using the configuration file at:
+Mosquitto does not need to be installed or started separately. Compose runs
+it using the configuration file at:
 
 ```text
 
@@ -95,6 +134,44 @@ py -m pip install -r Prototype/requirements.txt
 
 ```
 
+## Move the existing database into Docker
+
+Back up the existing local PostgreSQL database before stopping it. Run from
+the repository root while local PostgreSQL is running:
+
+```powershell
+New-Item -ItemType Directory -Force .\Prototype\data
+pg_dump -h localhost -p 5434 -U postgres -d postgres --no-owner --no-acl -f .\Prototype\data\telemetry-backup.sql
+```
+
+The backup path is gitignored because it contains database data. If local
+PostgreSQL occupies port 5434, stop its Windows service after creating the
+backup. For PostgreSQL 17, run Administrator PowerShell:
+
+```powershell
+Stop-Service postgresql-x64-17
+```
+
+Start the PostgreSQL container with the credentials from `Prototype/.env`:
+
+```powershell
+docker compose --env-file Prototype/.env up -d postgres
+```
+
+Wait for `docker compose --env-file Prototype/.env ps postgres` to show the
+container as healthy.
+
+Restore the backup into the container:
+
+```powershell
+psql -h localhost -p 5434 -U postgres -d postgres -v ON_ERROR_STOP=1 -f .\Prototype\data\telemetry-backup.sql
+```
+
+The compose service keeps the database in the `postgres_data` named volume.
+Restarting or running `docker compose --env-file Prototype/.env down`
+preserves the data. Avoid `docker compose --env-file Prototype/.env down -v`,
+which deletes that volume.
+
 ## Network Addresses
 Windows applications use the ports:
 
@@ -105,9 +182,13 @@ Kafka: localhost:9092
 MQTT: localhost:1883
 
 Kafka Connect REST API: localhost:8083
+<<<<<<< HEAD
 
 Kafka UI: http://localhost:8080
 
+=======
+Kafka UI: http://localhost:8081
+>>>>>>> main
 ```
 
 Docker containers use these internal addresses:
@@ -121,36 +202,60 @@ MQTT from Kafka Connect: host.docker.internal:1883
 ```
 
 Kafka UI is configured to use `kafka:9093` in `docker-compose.yml`.
+The Windows API and database consumer connect to PostgreSQL at
+`localhost:5434`, as configured in `Prototype/.env`. Other Docker services
+can connect to PostgreSQL using `postgres:5432`.
 
 ## Start the Kafka Services Automatically
 From the project root:
 
-The startup script automatically starts Mosquitto, Kafka, Kafka UI, Kafka Connect, the Kafka topic, the MQTT connector, and the Kafka consumer. Mosquitto uses the project's `Prototype/mosquitto.conf` configuration so that Kafka Connect running in Docker can connect to the MQTT broker.
+The Kafka startup script starts PostgreSQL, Mosquitto, Kafka, Kafka UI,
+Kafka Connect, the Kafka topic, the MQTT connector, and a Python consumer
+that writes records into the same PostgreSQL
+`iot_telemetry_data` table. The consumer uses the `Prototype/.env` settings
+shared with the API. Mosquitto uses the project's `Prototype/mosquitto.conf`
+configuration so Kafka Connect running in Docker can connect to the MQTT
+broker.
 
 Run it from the project root:
 
 ```powershell
+<<<<<<< HEAD
 
 Set-Location "C:\Devops_Group_Project" (This is to set your directory)
 
+=======
+Set-Location "C:\Devops_Group_Project"
+>>>>>>> main
 py .\Prototype\scripts\start_kafka.py
 
 ```
 
+Leave this terminal running; it remains attached to the database consumer.
+Start the sensor in another terminal using the command in **Start the Sensor**.
+
 Check the containers:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose ps
 
+=======
+docker compose --env-file Prototype/.env ps
+>>>>>>> main
 ```
 
 Follow Kafka logs if needed:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose logs -f kafka
 
+=======
+docker compose --env-file Prototype/.env logs -f kafka
+>>>>>>> main
 ```
 
 Verify that Kafka is reachable from Windows:
@@ -172,9 +277,13 @@ TcpTestSucceeded : True
 Open Kafka UI at:
 
 ```text
+<<<<<<< HEAD
 
 http://localhost:8080
 
+=======
+http://localhost:8081
+>>>>>>> main
 ```
 
 The script waits for Kafka before creating `sensor-telemetry`. It also waits for Kafka Connect before registering the MQTT source connector.
@@ -182,9 +291,13 @@ The script waits for Kafka before creating `sensor-telemetry`. It also waits for
 Check the running services:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose ps
 
+=======
+docker compose --env-file Prototype/.env ps
+>>>>>>> main
 ```
 
 Check Kafka Connect:
@@ -249,11 +362,17 @@ py .\Prototype\Data_Sensor.py
 
 ```
 
-The sensor currently uses `localhost:1883`, which is correct because Mosquitto is running on Windows.
+The sensor publishes to `localhost:1883`, which Compose publishes from the
+Docker Mosquitto container to Windows.
 
 ## View Data in Kafka UI
+<<<<<<< HEAD
 1. Open `http://localhost:8080`.
 
+=======
+
+1. Open `http://localhost:8081`.
+>>>>>>> main
 2. Select the `local` cluster.
 
 3. Open the `sensor-telemetry` topic.
@@ -270,23 +389,43 @@ The topic should contain the JSON sensor records.
 Stop the Windows processes with `Ctrl+C`, then stop Docker services:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose down
 
+=======
+docker compose --env-file Prototype/.env down
+>>>>>>> main
 ```
 
-Do not use `docker compose down -v` unless you intentionally want to remove Docker volumes and stored Kafka data.
+This stops containers but preserves the PostgreSQL volume and its data. Do
+not use `docker compose --env-file Prototype/.env down -v` unless you
+intentionally want to delete the database volume and stored Kafka data.
 
 ## Previous Setup Scope (Historical)
+<<<<<<< HEAD
 The current Compose file containerizes Kafka and Kafka UI only. A fully containerized setup would also need Compose services for Mosquitto, Kafka Connect, the MQTT connector plugin, the sensor, and the Kafka consumer.
 
 ## Dockerised IoT Control System — 21/10/26 updated
 ### Overview
+=======
+
+The current Compose file runs PostgreSQL, Kafka, Kafka UI, Kafka Connect,
+Mosquitto, Grafana, and the IoT control components in Docker. The Windows
+Kafka consumer remains a separate process and connects to PostgreSQL using
+`Prototype/.env`.
+
+## Dockerised IoT Control System — 21/10/26 updated
+
+### Overview
+
+>>>>>>> main
 The IoT control components have been containerised using Docker Compose. The system reads sensor data from a CSV file, publishes readings through MQTT, evaluates configurable control rules and sends commands to an actuator simulator.
 
 The relevant services are:
 
 - `mosquitto` — MQTT broker
+<<<<<<< HEAD
 
 - `sensor-simulator` — publishes CSV sensor readings
 
@@ -301,11 +440,23 @@ The relevant services are:
 
 | `sensors/telemetry` | Sensor readings published by the Sensor Simulator |
 
+=======
+- `sensor-simulator` — publishes CSV sensor readings
+- `control-logic` — processes sensor readings and applies PostgreSQL control settings
+- `actuator-simulator` — receives and simulates actuator commands
+
+### MQTT Topics
+
+| Topic | Purpose |
+|---|---|
+| `sensors/telemetry` | Sensor readings published by the Sensor Simulator |
+>>>>>>> main
 | `actuators/commands` | Commands published by Control Logic |
 
 All three Python services connect to the Docker MQTT broker using `mosquitto:1883`.
 
 ### Starting the Containers
+<<<<<<< HEAD
 Open PowerShell in the project root directory.
 
 Ensure Docker Desktop is running and the required local PostgreSQL databases are accessible.
@@ -319,26 +470,59 @@ DB_PASSWORD=your_local_postgresql_password
 ```
 
 Do not commit `.env` files or database passwords to Git.
+=======
+
+Open PowerShell in the project root directory.
+
+Ensure Docker Desktop is running. The telemetry PostgreSQL database runs
+from this Compose file; Control Logic's `control_settings_db` is a separate
+existing database and must be available using the configured settings.
+
+Create `Prototype/.env` containing the database settings used by the
+PostgreSQL container and Python API:
+
+```dotenv
+DB_HOST=localhost
+DB_PORT=5434
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=choose_a_private_password
+```
+
+Do not commit `.env` files or database passwords to Git. Set any Grafana or
+Control Logic-specific variables needed by your local setup in this file as
+well. Use `--env-file Prototype/.env` with Compose commands so all services
+receive the same values.
+>>>>>>> main
 
 Build and start the four IoT services:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose up -d --build mosquitto control-logic actuator-simulator
 
+=======
+docker compose --env-file Prototype/.env up -d --build mosquitto control-logic actuator-simulator
+>>>>>>> main
 ```
 
 Start or replay the Sensor Simulator:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose up -d --force-recreate sensor-simulator
 
+=======
+docker compose --env-file Prototype/.env up -d --force-recreate sensor-simulator
+>>>>>>> main
 ```
 
 Check container status:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose ps
 
@@ -346,10 +530,22 @@ docker compose ps
 
 ### PostgreSQL Configuration
 Control Logic currently connects to PostgreSQL running on the host machine.
+=======
+docker compose --env-file Prototype/.env ps
+```
+
+### PostgreSQL Configuration
+
+The telemetry API and Kafka consumer connect to the Compose PostgreSQL
+service through `localhost:5434` from Windows. The Dockerized Control Logic
+connects to the telemetry service by the Compose hostname `postgres` on port
+5432. Its control settings database remains separately configurable.
+>>>>>>> main
 
 The Docker Compose configuration uses:
 
 | Variable | Current value |
+<<<<<<< HEAD
 
 |---|---|
 
@@ -366,17 +562,34 @@ The Docker Compose configuration uses:
 | `CONTROL_DB_NAME` | `control_settings_db` by default |
 
 The actual database names and credentials must match the local PostgreSQL setup.
+=======
+|---|---|
+| `DB_HOST` | `postgres` inside Docker; `localhost` on Windows |
+| `DB_PORT` | `5432` inside Docker; `5434` on Windows |
+| `DB_NAME` | `postgres` by default |
+| `CONTROL_DB_HOST` | `host.docker.internal` |
+| `CONTROL_DB_PORT` | Configured host PostgreSQL port |
+| `CONTROL_DB_NAME` | `control_settings_db` by default |
+
+The actual control database name and credentials must match the PostgreSQL
+instance containing `control_settings_db`.
+>>>>>>> main
 
 Control settings are retrieved from the `control_settings` table, including:
 
 - `temperature_threshold`
+<<<<<<< HEAD
 
 - `humidity_threshold`
 
+=======
+- `humidity_threshold`
+>>>>>>> main
 - `light_enabled`
 
 The Control Logic uses these saved values to determine which actuator commands to publish.
 
+<<<<<<< HEAD
 **Group integration note:** When Simon's PostgreSQL container is integrated, the database hostnames, ports and service dependencies will need to be updated and retested.
 
 ### Testing the Sensor-to-Actuator Flow
@@ -386,27 +599,44 @@ Check that the Sensor Simulator publishes CSV readings:
 
 docker compose logs --tail=50 sensor-simulator
 
+=======
+### Testing the Sensor-to-Actuator Flow
+
+Check that the Sensor Simulator publishes CSV readings:
+
+```powershell
+docker compose --env-file Prototype/.env logs --tail=50 sensor-simulator
+>>>>>>> main
 ```
 
 Check that Control Logic receives sensor readings and publishes commands:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose logs --tail=100 control-logic
 
+=======
+docker compose --env-file Prototype/.env logs --tail=100 control-logic
+>>>>>>> main
 ```
 
 Check that the Actuator Simulator receives commands:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose logs --tail=50 actuator-simulator
 
+=======
+docker compose --env-file Prototype/.env logs --tail=50 actuator-simulator
+>>>>>>> main
 ```
 
 The expected flow is:
 
 ```text
+<<<<<<< HEAD
 
 Data_Sensor.py
 
@@ -458,10 +688,44 @@ The following tests were completed during SCRUM-102:
 - A separate below-threshold test generated no actuator commands.
 
 ### Group Handover Notes
+=======
+Data_Sensor.py
+    |
+    v
+Mosquitto MQTT (sensors/telemetry)
+    |
+    v
+Control_Logic.py
+    |
+    +-- PostgreSQL control settings
+    |
+    v
+Mosquitto MQTT (actuators/commands)
+    |
+    v
+Actuator_Simulator.py
+```
+
+### Testing Completed
+
+The following tests were completed during SCRUM-102:
+
+- All four IoT components started successfully using Docker Compose.
+- The Sensor Simulator published 10 readings from the IoT CSV dataset.
+- Control Logic received live MQTT sensor messages.
+- Control Logic successfully retrieved PostgreSQL settings.
+- Readings exceeding the configured humidity threshold generated Dehumidifier ON commands.
+- The Actuator Simulator received and simulated the commands.
+- A separate below-threshold test generated no actuator commands.
+
+### Group Handover Notes
+
+>>>>>>> main
 The IoT control components have been containerised and tested together.
 
 Before the full group deployment, the following integration points should be reviewed:
 
+<<<<<<< HEAD
 1. Replace the current host-based PostgreSQL connections when the database container is available.
 
 2. Verify that Kafka Connect uses the Docker Mosquitto broker instead of the old Windows broker.
@@ -479,11 +743,31 @@ Stop the IoT components without removing the rest of the group's running service
 
 docker compose stop sensor-simulator control-logic actuator-simulator mosquitto
 
+=======
+1. Confirm that the existing `control_settings_db` is reachable using the
+   configured `CONTROL_DB_*` settings.
+2. Verify that Kafka Connect loads the MQTT plugin from the configured host
+   plugin directory.
+3. Replace the Windows-specific Kafka Connect plugin path when running on a
+   different operating system.
+4. Confirm that all services start correctly using the local
+   `Prototype/.env`.
+5. Retest the complete sensor, Kafka, telemetry database, control and
+   actuator flow after starting the merged Compose stack.
+
+### Stopping the Services
+
+Stop the IoT components without removing the rest of the group's running services:
+
+```powershell
+docker compose --env-file Prototype/.env stop sensor-simulator control-logic actuator-simulator mosquitto
+>>>>>>> main
 ```
 
 The MQTT broker currently allows anonymous connections for local development. Authentication and appropriate access controls should be added before production deployment.
 
 ## Control API
+<<<<<<< HEAD
 The Control API runs as a Docker Compose service alongside the other project components. It provides API endpoints for accessing and managing the control system.
 
 ### Prerequisites
@@ -491,11 +775,21 @@ The Control API runs as a Docker Compose service alongside the other project com
 
 - The project repository has been cloned.
 
+=======
+
+The Control API runs as a Docker Compose service alongside the other project components. It provides API endpoints for accessing and managing the control system.
+
+### Prerequisites
+
+- Docker Desktop is installed and running.
+- The project repository has been cloned.
+>>>>>>> main
 - The required environment variables and database settings are configured in the project's local `.env` file.
 
 Do not commit passwords or other secrets to Git.
 
 ### Start the Control API
+<<<<<<< HEAD
 Run these commands from the project root:
 
 ```powershell
@@ -504,41 +798,70 @@ docker compose config --quiet
 
 docker compose up -d --build control-api
 
+=======
+
+Run these commands from the project root:
+
+```powershell
+docker compose --env-file Prototype/.env config --quiet
+docker compose --env-file Prototype/.env up -d --build control-api
+>>>>>>> main
 ```
 
 Check the service status:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose ps control-api
 
+=======
+docker compose --env-file Prototype/.env ps control-api
+>>>>>>> main
 ```
 
 View the API logs if needed:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose logs --tail=50 control-api
 
 ```
 
 ### Access the API
+=======
+docker compose --env-file Prototype/.env logs --tail=50 control-api
+```
+
+### Access the API
+
+>>>>>>> main
 Once the service is running, open the interactive API documentation:
 
 `http://localhost:8000/docs`
 
 ### Stop the Control API
+<<<<<<< HEAD
 To stop only the Control API:
 
 ```powershell
 
 docker compose stop control-api
 
+=======
+
+To stop only the Control API:
+
+```powershell
+docker compose --env-file Prototype/.env stop control-api
+>>>>>>> main
 ```
 
 To rebuild and restart it after code changes:
 
 ```powershell
+<<<<<<< HEAD
 
 docker compose up -d --build control-api
 
@@ -737,3 +1060,14 @@ The building-specific command topics verified were `buildings/1/actuators/comman
 - `SCRUM-122-Database-Isolation.png`
 
 **Limitations and outstanding work:** Database settings and connections were mocked; MQTT publishing was not tested with a live broker; device-building mappings were mocked. Live persistence, cross-building update isolation and complete frontend/authentication/PostgreSQL/MQTT end-to-end behaviour remained unverified. The original report noted that SCRUM-121 disabled the legacy control-settings endpoints and that the frontend required migration. The team still needed to agree the admin-only update policy. Thus the four PASS results establish **logic isolation under mocks only**, not production-ready multi-building isolation.
+=======
+docker compose --env-file Prototype/.env up -d --build control-api
+```
+
+### Troubleshooting
+
+- If the container does not start, check the logs using `docker compose --env-file Prototype/.env logs control-api`.
+- If port 8000 is already in use, check for another service using that port.
+- If the API cannot connect to the database, check the `.env` settings and confirm that the database service or configured database host is reachable.
+- If the Compose configuration is invalid, run `docker compose --env-file Prototype/.env config` to display the resolved configuration and look for errors.
+>>>>>>> main

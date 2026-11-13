@@ -1,9 +1,38 @@
+<<<<<<< HEAD
 ﻿services:
   mosquitto:
     image: eclipse-mosquitto:2
     volumes:
     - ./Prototype/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
+=======
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-postgres}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in Prototype/.env}
+    ports:
+      - "${DB_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./Prototype/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+>>>>>>> main
   kafka:
     image: apache/kafka-native
     ports:
@@ -35,7 +64,11 @@
   kafka-ui:
     image: kafbat/kafka-ui:main
     ports:
+<<<<<<< HEAD
       - 8081:8080
+=======
+      - "8081:8080"
+>>>>>>> main
     environment:
       DYNAMIC_CONFIG_ENABLED: "true"
       KAFKA_CLUSTERS_0_NAME: local
@@ -70,6 +103,11 @@
     depends_on:
       kafka:
         condition: service_healthy
+<<<<<<< HEAD
+=======
+      mosquitto:
+        condition: service_started
+>>>>>>> main
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -79,7 +117,11 @@
       - ./Prototype/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./Prototype/grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
+<<<<<<< HEAD
       GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD}
+=======
+      GF_DATASOURCE_PASSWORD: ${GF_DATASOURCE_PASSWORD:-${DB_PASSWORD}}
+>>>>>>> main
     restart: unless-stopped
 
   control-logic:
@@ -89,16 +131,23 @@
     image: iot-control-logic:latest
     environment:
       PYTHONUNBUFFERED: "1"
+<<<<<<< HEAD
       KAFKA_BOOTSTRAP_SERVERS: kafka:9093
       KAFKA_TOPIC: sensor-telemetry
       KAFKA_COMMAND_TOPIC: actuator-commands
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
       DB_HOST: iot-postgres
+=======
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      DB_HOST: postgres
+>>>>>>> main
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
+<<<<<<< HEAD
       CONTROL_DB_HOST: iot-postgres
       CONTROL_DB_PORT: "5432"
       CONTROL_DB_NAME: control_settings_db
@@ -123,6 +172,15 @@
       MQTT_PORT: "1883"
     depends_on:
       kafka:
+=======
+      CONTROL_DB_HOST: host.docker.internal
+      CONTROL_DB_PORT: "5432"
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+    depends_on:
+      postgres:
+>>>>>>> main
         condition: service_healthy
       mosquitto:
         condition: service_started
@@ -135,6 +193,12 @@
     environment:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
+<<<<<<< HEAD
+=======
+    depends_on:
+      mosquitto:
+        condition: service_started
+>>>>>>> main
 
   actuator-simulator:
     build:
@@ -144,7 +208,13 @@
     environment:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
+<<<<<<< HEAD
 
+=======
+    depends_on:
+      mosquitto:
+        condition: service_started
+>>>>>>> main
 
   control-api:
     build:
@@ -154,12 +224,18 @@
     ports:
       - "8000:8000"
     environment:
+<<<<<<< HEAD
       DB_HOST: host.docker.internal
       DB_PORT: "${DB_PORT:-5432}"
+=======
+      DB_HOST: postgres
+      DB_PORT: "5432"
+>>>>>>> main
       DB_NAME: ${DB_NAME:-postgres}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in your local .env file}
       CONTROL_DB_HOST: host.docker.internal
+<<<<<<< HEAD
       CONTROL_DB_PORT: "${AUTH_DB_PORT:-5436}"
       CONTROL_DB_NAME: ${AUTH_DB_NAME:-scrum108_test_db}
       CONTROL_DB_USER: ${AUTH_DB_USER:-postgres}
@@ -196,4 +272,16 @@
 
 
 volumes:
+=======
+      CONTROL_DB_PORT: "${CONTROL_DB_PORT:-5432}"
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-control_settings_db}
+      CONTROL_DB_USER: ${CONTROL_DB_USER:-postgres}
+      CONTROL_DB_PASSWORD: ${CONTROL_DB_PASSWORD:-${DB_PASSWORD}}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+>>>>>>> main
   grafana-data:

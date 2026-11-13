@@ -70,7 +70,11 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
+<<<<<<< HEAD
                         "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  temp\r\nFROM (\r\n    SELECT ts, temp\r\n    FROM iot_telemetry_data\r\n    ORDER BY ts DESC\r\n    LIMIT 100\r\n) AS latest\r\nORDER BY ts ASC;",
+=======
+                        "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  temp\r\nFROM iot_telemetry_data\r\nORDER BY ts\r\nLIMIT 100;\r\n",
+>>>>>>> main
                         "sql": {
                           "columns": [
                             {
@@ -202,7 +206,11 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
+<<<<<<< HEAD
                         "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  humidity\r\nFROM (\r\n    SELECT ts, humidity\r\n    FROM iot_telemetry_data\r\n    ORDER BY ts DESC\r\n    LIMIT 100\r\n) AS latest\r\nORDER BY ts ASC;",
+=======
+                        "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  humidity\r\nFROM iot_telemetry_data\r\nORDER BY ts\r\nLIMIT 100;\r\n",
+>>>>>>> main
                         "sql": {
                           "columns": [
                             {
@@ -334,7 +342,11 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
+<<<<<<< HEAD
                         "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  co\r\nFROM (\r\n    SELECT ts, co\r\n    FROM iot_telemetry_data\r\n    ORDER BY ts DESC\r\n    LIMIT 100\r\n) AS latest\r\nORDER BY ts ASC;",
+=======
+                        "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  co\r\nFROM iot_telemetry_data\r\nORDER BY ts\r\nLIMIT 100;\r\n",
+>>>>>>> main
                         "sql": {
                           "columns": [
                             {
@@ -466,7 +478,11 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
+<<<<<<< HEAD
                         "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  lpg\r\nFROM (\r\n    SELECT ts, lpg\r\n    FROM iot_telemetry_data\r\n    ORDER BY ts DESC\r\n    LIMIT 100\r\n) AS latest\r\nORDER BY ts ASC;",
+=======
+                        "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  lpg\r\nFROM iot_telemetry_data\r\nORDER BY ts\r\nLIMIT 100;\r\n",
+>>>>>>> main
                         "sql": {
                           "columns": [
                             {
@@ -598,7 +614,11 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
+<<<<<<< HEAD
                         "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  smoke\r\nFROM (\r\n    SELECT ts, smoke\r\n    FROM iot_telemetry_data\r\n    ORDER BY ts DESC\r\n    LIMIT 100\r\n) AS latest\r\nORDER BY ts ASC;",
+=======
+                        "rawSql": "SELECT\r\n  to_timestamp(ts) AS \"time\",\r\n  smoke\r\nFROM iot_telemetry_data\r\nORDER BY ts\r\nLIMIT 100;\r\n",
+>>>>>>> main
                         "sql": {
                           "columns": [
                             {
@@ -1144,8 +1164,13 @@
     "tags": [],
     "timeSettings": {
       "timezone": "browser",
+<<<<<<< HEAD
       "from": "now-7d",
       "to": "now",
+=======
+      "from": "2020-07-12T00:01:34.385Z",
+      "to": "2020-07-12T00:04:18.716Z",
+>>>>>>> main
       "autoRefresh": "",
       "autoRefreshIntervals": [
         "5s",
@@ -1173,4 +1198,8 @@
       }
     }
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> main
