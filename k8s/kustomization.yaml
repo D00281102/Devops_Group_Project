@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - headlamp.yaml
+  - control-api.yaml
+  - postgres-schema.yaml
+  - mosquitto.yaml
+  - kafka.yaml
+  - kafka-connect.yaml
+  - kafka-topics.yaml
+  - mqtt-source-connector.yaml
+  - iot-simulators.yaml
+  - control-logic.yaml
+  - kafka-mqtt-bridge.yaml
+  - telemetry-consumer.yaml
