@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-schema
+  namespace: devops
+data:
+  schema.sql: |
+    CREATE TABLE IF NOT EXISTS iot_telemetry_data (
+        records SERIAL PRIMARY KEY,
+        ts DOUBLE PRECISION NOT NULL,
+        device VARCHAR(100) NOT NULL,
+        co DOUBLE PRECISION NOT NULL,
+        humidity DOUBLE PRECISION NOT NULL,
+        light BOOLEAN NOT NULL,
+        lpg DOUBLE PRECISION NOT NULL,
+        motion BOOLEAN NOT NULL,
+        smoke DOUBLE PRECISION NOT NULL,
+        temp DOUBLE PRECISION NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS control_settings (
+        id SERIAL PRIMARY KEY,
+        temperature_threshold DOUBLE PRECISION NOT NULL,
+        humidity_threshold DOUBLE PRECISION NOT NULL,
+        light_enabled BOOLEAN NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT INTO control_settings (
+        temperature_threshold,
+        humidity_threshold,
+        light_enabled
+    )
+    SELECT 25, 70, TRUE
+    WHERE NOT EXISTS (SELECT 1 FROM control_settings);
+
+    CREATE TABLE IF NOT EXISTS users (
+        user_id SERIAL PRIMARY KEY,
+        full_name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS buildings (
+        building_id SERIAL PRIMARY KEY,
+        building_name VARCHAR(150) NOT NULL,
+        building_code VARCHAR(64) NOT NULL UNIQUE,
+        created_by INTEGER NOT NULL REFERENCES users(user_id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS building_devices (
+        device_id VARCHAR(100) PRIMARY KEY,
+        building_id INTEGER NOT NULL REFERENCES buildings(building_id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-schema
+  namespace: devops
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: postgres-schema
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: host.docker.internal
+            - name: PGPORT
+              value: "5434"
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: control-api-env
+                  key: DB_NAME
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: control-api-env
+                  key: DB_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: control-api-env
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - psql --set ON_ERROR_STOP=1 --file=/schema/schema.sql
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+      volumes:
+        - name: schema
+          configMap:
+            name: postgres-schema
