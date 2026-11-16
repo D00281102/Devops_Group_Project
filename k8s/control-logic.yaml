@@ -44,7 +44,17 @@ spec:
             - name: CONTROL_DB_PORT
               value: "5434"
             - name: CONTROL_DB_NAME
-              value: test_db
+              value: postgres
+            - name: CONTROL_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: control-api-env
+                  key: DB_USER
+            - name: CONTROL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: control-api-env
+                  key: DB_PASSWORD
             - name: AUTH_DB_HOST
               value: host.docker.internal
             - name: AUTH_DB_PORT
