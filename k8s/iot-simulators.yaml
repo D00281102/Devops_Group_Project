@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sensor-simulator
+  namespace: devops
+  labels:
+    app.kubernetes.io/name: sensor-simulator
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sensor-simulator
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: sensor-simulator
+          image: iot-sensor-simulator:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MQTT_BROKER
+              value: mosquitto
+            - name: MQTT_PORT
+              value: "1883"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: actuator-simulator
+  namespace: devops
+  labels:
+    app.kubernetes.io/name: actuator-simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: actuator-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: actuator-simulator
+    spec:
+      containers:
+        - name: actuator-simulator
+          image: iot-actuator-simulator:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MQTT_BROKER
+              value: mosquitto
+            - name: MQTT_PORT
+              value: "1883"
+            - name: BUILDING_ID
+              value: "1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
