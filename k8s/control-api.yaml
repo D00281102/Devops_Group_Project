@@ -25,6 +25,21 @@ spec:
           envFrom:
             - secretRef:
                 name: control-api-env
+          env:
+            - name: DB_HOST
+              value: host.docker.internal
+            - name: DB_PORT
+              value: "5434"
+            - name: CONTROL_DB_HOST
+              value: host.docker.internal
+            - name: CONTROL_DB_PORT
+              value: "5434"
+            - name: CONTROL_DB_NAME
+              value: test_db
+            - name: AUTH_DB_HOST
+              value: host.docker.internal
+            - name: AUTH_DB_PORT
+              value: "5434"
           readinessProbe:
             httpGet:
               path: /
