@@ -708,6 +708,109 @@ The proposed schema was created and tested in a separate PostgreSQL Docker test 
 
 The SQL migration source remains at `Prototype/docs/scrum108_schema.sql` (a SQL file, not an extra Markdown document). It depends on the existing `control_settings` table, so initialise that table before running the migration. Before applying to shared infrastructure: back up the database; preserve existing telemetry and initialisation; review primary/foreign keys and unique constraints; store only hashed passwords; verify membership and building-scoped API access; map sensors to buildings; and test the new control logic before retiring global `id = 1` behaviour. The later authentication documentation above describes a separate subsequent implementation and does not retroactively change the SCRUM-108 test status.
 
+# Local Kubernetes Deployment with kind and Headlamp
+
+This section describes the local Kubernetes deployment for the complete IoT stack. It uses [kind-config.yaml](kind-config.yaml) to create a kind cluster and the manifests under `k8s/` to deploy the application.
+
+## Prerequisites
+
+Install and start Docker Desktop, kind, kubectl, and Helm. The local PostgreSQL instance must be reachable on host port `5434`; Kubernetes containers use `host.docker.internal` to reach PostgreSQL on Windows.
+
+## Create and deploy
+
+From the project root:
+
+```powershell
+kind create cluster --name devops --config .\kind-config.yaml
+kubectl config use-context kind-devops
+kubectl get nodes
+kubectl apply -k .\k8s
+kubectl get pods --namespace devops
+```
+
+The control-plane and worker nodes should report `Ready`. Long-running services should report `Running`; the PostgreSQL schema, Kafka topic, and MQTT connector Jobs should report `Complete`.
+
+## Open Headlamp
+
+Port `4466` may be occupied by the Windows Headlamp application, so use port `4467`:
+
+```powershell
+kubectl port-forward --context kind-devops `
+  --namespace headlamp `
+  service/headlamp 4467:80
+```
+
+Open <http://127.0.0.1:4467>.
+
+## Open and verify the Control API
+
+Run this in a separate terminal:
+
+```powershell
+kubectl port-forward --context kind-devops `
+  --namespace devops `
+  service/control-api 8001:8000
+```
+
+Open <http://127.0.0.1:8001/> or verify the health endpoint:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:8001/ |
+  Select-Object StatusCode, Content
+```
+
+The expected response is HTTP `200` with `{"status":"ok"}`.
+
+## Verify Kafka Connect and telemetry
+
+```powershell
+$connectPod = kubectl get pod `
+  --context kind-devops `
+  --namespace devops `
+  -l app.kubernetes.io/name=kafka-connect `
+  -o jsonpath="{.items[0].metadata.name}"
+
+kubectl exec --context kind-devops --namespace devops $connectPod -- `
+  curl -s http://localhost:8083/connectors/mqtt-source/status
+
+kubectl logs --context kind-devops --namespace devops `
+  deployment/telemetry-consumer --tail=30
+```
+
+The connector and task should report `RUNNING`. Successful telemetry processing includes messages such as `Inserted telemetry record`.
+
+## Kubernetes manifest inventory
+
+- `kind-config.yaml` — kind cluster definition
+- `k8s/namespaces.yaml` — application namespaces
+- `k8s/headlamp.yaml` — Headlamp deployment and access
+- `k8s/control-api.yaml` — FastAPI service
+- `k8s/postgres-schema.yaml` — local PostgreSQL schema initialization
+- `k8s/mosquitto.yaml` — MQTT broker
+- `k8s/iot-simulators.yaml` — sensor and actuator simulators
+- `k8s/kafka.yaml` — Kafka broker
+- `k8s/kafka-topics.yaml` — Kafka topic initialization
+- `k8s/kafka-connect.yaml` — Kafka Connect runtime
+- `k8s/mqtt-source-connector.yaml` — MQTT-to-Kafka connector
+- `k8s/control-logic.yaml` — control worker
+- `k8s/kafka-mqtt-bridge.yaml` — Kafka-to-MQTT actuator bridge
+- `k8s/telemetry-consumer.yaml` — Kafka-to-PostgreSQL consumer
+- `k8s/kustomization.yaml` — complete deployment entrypoint
+
+## Troubleshooting and limitations
+
+- If port `8001` or `4467` is already in use, choose another local port.
+- Inspect failures with `kubectl describe pod <pod-name> -n devops` and `kubectl logs <pod-name> -n devops`.
+- Validate the bundle without changing resources:
+
+```powershell
+kubectl kustomize .\k8s | `
+  kubectl apply --dry-run=server -f - `
+  --context kind-devops
+```
+
+This kind deployment is for local development. Kafka uses ephemeral storage, MQTT allows anonymous access, and Headlamp uses broad local-cluster permissions. These settings require hardening before production use.
+
 # SCRUM-122 — Multi-Building Control Isolation Test Evidence
 
 **Test date:** 2 November 2026. **Branch:** `liam/multi-building-control`. **Code under test:** `Prototype/Control_Logic.py`. **Method:** in-process Python tests using mocked PostgreSQL connections, MQTT clients and building mappings. These were *mocked isolation tests*, not a live end-to-end deployment test.
