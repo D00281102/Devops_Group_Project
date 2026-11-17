@@ -110,7 +110,7 @@ def replay_sensor_data():
 
     client = connect_to_mqtt()
 
-    with open(DATA_FILE, "r", newline="", encoding="utf-8") as file:
+    with open(DATA_FILE, "r", newline="", encoding="utf-8-sig") as file:
         reader = csv.DictReader(file)
 
         print("Starting IoT sensor simulation...\n")

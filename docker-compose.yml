@@ -1,4 +1,4 @@
-﻿services:
+services:
   mosquitto:
     image: eclipse-mosquitto:2
     volumes:
@@ -135,7 +135,16 @@
     environment:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
+      BUILDING_ID: "1"
+      DATASET_PATH: data/iot_telemetry_data.csv
 
+  sensor-simulator-building-2:
+    image: iot-sensor-simulator:latest
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      BUILDING_ID: "2"
+      DATASET_PATH: data/building_2.csv
   actuator-simulator:
     build:
       context: ./Prototype
