@@ -197,21 +197,21 @@ def evaluate_sensor_data(sensor_data, settings=None):
 
     commands = []
 
-    if sensor_data["temp"] >= settings["temperature_threshold"]:
+    if sensor_data.get("temp") is not None and sensor_data["temp"] >= settings["temperature_threshold"]:
         commands.append({
             "actuator": "fan",
             "action": "ON",
             "reason": "High temperature detected"
         })
 
-    if sensor_data["humidity"] >= settings["humidity_threshold"]:
+    if sensor_data.get("humidity") is not None and sensor_data["humidity"] >= settings["humidity_threshold"]:
         commands.append({
             "actuator": "dehumidifier",
             "action": "ON",
             "reason": "High humidity detected"
         })
 
-    if settings["light_enabled"] and sensor_data["light"]:
+    if settings["light_enabled"] and sensor_data.get("light") is True:
         commands.append({
             "actuator": "light",
             "action": "ON",
