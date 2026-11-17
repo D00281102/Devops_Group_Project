@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mqtt-source-connector
+  namespace: devops
+  labels:
+    app.kubernetes.io/name: mqtt-source-connector
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mqtt-source-connector
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: register-connector
+          image: iot-control-api:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -c
+            - >-
+              import requests;
+              connect_url = "http://kafka-connect:8083";
+              connector_url = connect_url + "/connectors";
+              payload = {
+              "name": "mqtt-source",
+              "config": {
+              "connector.class": "io.confluent.connect.mqtt.MqttSourceConnector",
+              "tasks.max": "1",
+              "mqtt.server.uri": "tcp://mosquitto:1883",
+              "mqtt.topics": "sensors/telemetry",
+              "mqtt.qos": "0",
+              "kafka.topic": "sensor-telemetry",
+              "confluent.topic.bootstrap.servers": "kafka:9093",
+              "confluent.topic.replication.factor": "1",
+              "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+              "value.converter": "org.apache.kafka.connect.converters.ByteArrayConverter"
+              }};
+              response = requests.get(connect_url, timeout=5);
+              response.raise_for_status();
+              response = requests.post(connector_url, json=payload, timeout=10);
+              print(response.status_code, response.text)
