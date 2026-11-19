@@ -14,3 +14,4 @@ resources:
   - control-logic.yaml
   - kafka-mqtt-bridge.yaml
   - telemetry-consumer.yaml
+  - ingress.yaml
