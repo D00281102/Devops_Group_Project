@@ -5,3 +5,6 @@ psycopg[binary]
 python-dotenv
 psycopg_pool
 requests
+
+# Test client dependency
+httpx2

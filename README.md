@@ -473,3 +473,7 @@ List tables in `postgres`:
 View all telemetry rows directly in SQL:
 
     psql -U postgres -h localhost -p 5434 -d postgres -c "SELECT * FROM iot_telemetry_data LIMIT 10;"
+
+## 13. Automated testing
+
+See [TESTING.md](TESTING.md) for instructions on installing test dependencies and running the full automated test suite.

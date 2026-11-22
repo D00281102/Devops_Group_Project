@@ -267,18 +267,27 @@ class TestKafkaIntegration(unittest.TestCase):
 
 class TestDatabaseIntegration(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # Mock the connection pool before importing the database module
+    def setUp(self):
+        # Load the real database module without using the API test mock
+        import importlib.util
+
+        db_path = Path(__file__).parent / "api" / "db.py"
+
+        spec = importlib.util.spec_from_file_location(
+            "real_api_db",
+            db_path
+        )
+
+        self.api_db = importlib.util.module_from_spec(spec)
+
         with patch.object(
             psycopg_pool,
             "ConnectionPool"
         ) as mock_pool_class:
 
-            cls.api_db = importlib.import_module("api.db")
-            cls.mock_pool = mock_pool_class.return_value
+            spec.loader.exec_module(self.api_db)
+            self.mock_pool = mock_pool_class.return_value
 
-    def setUp(self):
         self.connection = MagicMock()
 
         self.connection_context = MagicMock()
