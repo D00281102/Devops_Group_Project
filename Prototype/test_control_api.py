@@ -238,6 +238,54 @@ class TestControlAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), expected_result)
 
+    def test_invalid_telemetry_record_id(self):
+        response = self.client.get("/telemetry/not-a-number")
+        self.assertEqual(response.status_code, 422)
+
+    def test_invalid_pagination_parameters(self):
+        response = self.client.get("/telemetry/?limit=invalid")
+        self.assertEqual(response.status_code, 422)
+
+    def test_update_with_invalid_field_type(self):
+        response = self.client.put(
+            "/telemetry/1",
+            json={"temp": "not-a-number"}
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_empty_telemetry_list(self):
+        self.mock_database(fetchall=[])
+
+        response = self.client.get("/telemetry/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])
+
+    def test_telemetry_response_fields(self):
+        self.mock_database(fetchone=self.sample_row())
+
+        response = self.client.get("/telemetry/1")
+
+        self.assertEqual(response.status_code, 200)
+
+        expected_fields = {
+            "records", "ts", "device", "co", "humidity",
+            "light", "lpg", "motion", "smoke", "temp"
+        }
+
+        self.assertEqual(set(response.json().keys()), expected_fields)
+        self.assertIsInstance(response.json()["device"], str)
+        self.assertIsInstance(response.json()["temp"], float)
+
+    def test_analytics_endpoint_error(self):
+        with patch.object(
+            analytics_routes,
+            "get_analytics_results",
+            side_effect=RuntimeError("Analytics unavailable")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.get("/analytics/")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
