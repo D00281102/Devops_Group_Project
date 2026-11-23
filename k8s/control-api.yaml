@@ -35,7 +35,7 @@ spec:
             - name: CONTROL_DB_PORT
               value: "5434"
             - name: CONTROL_DB_NAME
-              value: test_db
+              value: postgres
             - name: AUTH_DB_HOST
               value: host.docker.internal
             - name: AUTH_DB_PORT
