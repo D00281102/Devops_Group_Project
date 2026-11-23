@@ -229,7 +229,72 @@ The automated tests cover:
 
 The tests use mocks for external service connections where appropriate. Live MQTT, Kafka and PostgreSQL services are not required to run the automated test suite.
 
-A successful test run currently reports 42 tests passing.
+A successful test run currently reports 47 tests passing.
+
+## Control Settings API
+
+The project includes a Control Settings API for managing the sensor control thresholds.
+
+The settings are stored in the existing PostgreSQL database in a table called `control_settings`.
+
+### Database Setup
+
+Before using the Control Settings API, create the database table using the SQL setup file provided in the Prototype directory.
+
+Run the following command from the Prototype directory:
+
+```powershell
+psql -h localhost -p 5432 -U postgres -d postgres -f control_settings.sql
+```
+
+Update the connection details if your PostgreSQL configuration uses different values.
+
+The script creates the `control_settings` table and inserts the default settings if no settings row already exists. Existing settings are preserved.
+
+### Default Settings
+
+| Setting | Default Value |
+|---|---:|
+| Temperature threshold | 25°C |
+| Humidity threshold | 70% |
+| Light enabled | True |
+
+### API Endpoints
+
+The API provides two endpoints:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/control-settings` | Retrieves the saved control settings |
+| PUT | `/control-settings` | Updates the saved control settings |
+
+### Validation
+
+The API validates settings before saving them:
+
+- Temperature must be between -50 and 100.
+- Humidity must be between 0 and 100.
+- Light enabled must be a boolean value.
+
+Invalid settings return HTTP 422.
+
+### Testing
+
+The control settings API is covered by automated tests in `test_control_api.py`.
+
+Run the API tests from the `Prototype` directory:
+
+```powershell
+python -m unittest test_control_api -v
+```
+
+Run the complete test suite:
+
+```powershell
+python -m unittest discover -s . -p "test_*.py" -v
+```
+
+The full test suite currently contains 47 passing tests.
 
 ## Current Scope
 

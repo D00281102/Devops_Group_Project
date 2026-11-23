@@ -1,3 +1,4 @@
+from api.control_routes import control_router
 from fastapi import FastAPI
 from psycopg import OperationalError, IntegrityError
 
@@ -14,6 +15,7 @@ app.add_exception_handler(IntegrityError, db_integrity_error_handler)
 # Include API routers
 app.include_router(router)
 app.include_router(analytics_router)
+app.include_router(control_router)
 
 
 @app.get("/")

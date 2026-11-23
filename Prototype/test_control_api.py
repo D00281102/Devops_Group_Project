@@ -4,6 +4,8 @@ import types
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import api.analytics_routes as analytics_routes
+import api.control_routes as control_routes
 
 from fastapi.testclient import TestClient
 from psycopg import OperationalError, IntegrityError
@@ -48,6 +50,27 @@ class TestControlAPI(unittest.TestCase):
 
         database_patch = patch.object(
             api_routes,
+            "get_connection",
+            return_value=connection_context
+        )
+        database_patch.start()
+        self.addCleanup(database_patch.stop)
+
+        return cursor, conn
+
+    def mock_control_database(self, fetchone=None):
+        conn = MagicMock()
+        cursor = MagicMock()
+
+        connection_context = MagicMock()
+        connection_context.__enter__.return_value = conn
+        connection_context.__exit__.return_value = False
+
+        conn.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchone.return_value = fetchone
+
+        database_patch = patch.object(
+            control_routes,
             "get_connection",
             return_value=connection_context
         )
@@ -285,6 +308,86 @@ class TestControlAPI(unittest.TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 self.client.get("/analytics/")
+
+
+    def test_get_control_settings(self):
+        from datetime import datetime, timezone
+
+        saved_settings = (
+            25.0, 70.0, True,
+            datetime.now(timezone.utc)
+        )
+        self.mock_control_database(fetchone=saved_settings)
+
+        response = self.client.get("/control-settings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["temperature_threshold"], 25.0)
+        self.assertEqual(response.json()["humidity_threshold"], 70.0)
+        self.assertTrue(response.json()["light_enabled"])
+
+    def test_update_control_settings(self):
+        from datetime import datetime, timezone
+
+        saved_settings = (
+            28.0, 65.0, False,
+            datetime.now(timezone.utc)
+        )
+        cursor, conn = self.mock_control_database(
+            fetchone=saved_settings
+        )
+
+        response = self.client.put(
+            "/control-settings",
+            json={
+                "temperature_threshold": 28.0,
+                "humidity_threshold": 65.0,
+                "light_enabled": False
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["temperature_threshold"], 28.0)
+        self.assertEqual(response.json()["humidity_threshold"], 65.0)
+        self.assertFalse(response.json()["light_enabled"])
+        cursor.execute.assert_called_once()
+        conn.commit.assert_called_once()
+
+    def test_control_settings_invalid_temperature(self):
+        response = self.client.put(
+            "/control-settings",
+            json={
+                "temperature_threshold": 150,
+                "humidity_threshold": 65,
+                "light_enabled": True
+            }
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_control_settings_invalid_humidity(self):
+        response = self.client.put(
+            "/control-settings",
+            json={
+                "temperature_threshold": 25,
+                "humidity_threshold": 120,
+                "light_enabled": True
+            }
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_control_settings_invalid_light_value(self):
+        response = self.client.put(
+            "/control-settings",
+            json={
+                "temperature_threshold": 25,
+                "humidity_threshold": 65,
+                "light_enabled": "wrong"
+            }
+        )
+
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == "__main__":
