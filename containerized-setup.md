@@ -196,6 +196,41 @@ docker compose down
 
 Do not use `docker compose down -v` unless you intentionally want to remove Docker volumes and stored Kafka data.
 
+## Automated Testing
+
+The project uses Python's built-in `unittest` framework to run automated tests.
+
+### Install Dependencies
+
+From the project root, run:
+
+    python -m pip install -r Prototype/requirements.txt
+
+### Run All Tests
+
+Execute the following command from the project root:
+
+    python -m unittest discover -s Prototype -p "test_*.py" -v
+
+This automatically discovers and runs all test files inside the Prototype directory.
+
+### Test Coverage
+
+The automated tests cover:
+
+- Sensor analytics
+- Control API
+- Control logic
+- MQTT messaging
+- Kafka integration
+- Database connection handling
+
+### External Services
+
+The tests use mocks for external service connections where appropriate. Live MQTT, Kafka and PostgreSQL services are not required to run the automated test suite.
+
+A successful test run currently reports 42 tests passing.
+
 ## Current Scope
 
 The current Compose file containerizes Kafka and Kafka UI only. A fully containerized setup would also need Compose services for Mosquitto, Kafka Connect, the MQTT connector plugin, the sensor, and the Kafka consumer.
