@@ -15,6 +15,7 @@ spec:
       labels:
         app.kubernetes.io/name: control-logic
     spec:
+      restartPolicy: Always
       containers:
         - name: control-logic
           image: iot-control-logic:local

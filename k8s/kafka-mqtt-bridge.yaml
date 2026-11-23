@@ -15,6 +15,7 @@ spec:
       labels:
         app.kubernetes.io/name: kafka-mqtt-bridge
     spec:
+      restartPolicy: Always
       containers:
         - name: kafka-mqtt-bridge
           image: iot-kafka-mqtt-bridge:local

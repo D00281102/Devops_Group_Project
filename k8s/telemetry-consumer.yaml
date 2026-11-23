@@ -15,6 +15,7 @@ spec:
       labels:
         app.kubernetes.io/name: telemetry-consumer
     spec:
+      restartPolicy: Always
       containers:
         - name: telemetry-consumer
           image: iot-control-api:local
