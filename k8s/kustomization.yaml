@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - applications.yaml
+images:
+  - name: ghcr.io/d00281102/devops-group-project-control-api
+    newTag: latest
+  - name: ghcr.io/d00281102/devops-group-project-control-logic
+    newTag: latest

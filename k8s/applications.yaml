@@ -39,7 +39,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: control-api
-          image: ghcr.io/__IMAGE_OWNER__/devops-group-project-control-api:__IMAGE_TAG__
+          image: ghcr.io/d00281102/devops-group-project-control-api:latest
           imagePullPolicy: Always
           ports:
             - name: http
@@ -115,7 +115,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: control-logic
-          image: ghcr.io/__IMAGE_OWNER__/devops-group-project-control-logic:__IMAGE_TAG__
+          image: ghcr.io/d00281102/devops-group-project-control-logic:latest
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
