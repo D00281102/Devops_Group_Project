@@ -137,6 +137,9 @@ services:
       MQTT_PORT: "1883"
       BUILDING_ID: "1"
       DATASET_PATH: data/iot_telemetry_data.csv
+    depends_on:
+      mosquitto:
+        condition: service_started
 
   sensor-simulator-building-2:
     image: iot-sensor-simulator:latest
@@ -145,6 +148,9 @@ services:
       MQTT_PORT: "1883"
       BUILDING_ID: "2"
       DATASET_PATH: data/building_2.csv
+    depends_on:
+      mosquitto:
+        condition: service_started
   actuator-simulator:
     build:
       context: ./Prototype
@@ -153,6 +159,9 @@ services:
     environment:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
+    depends_on:
+      mosquitto:
+        condition: service_started
 
 
   control-api:
