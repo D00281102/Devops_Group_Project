@@ -1,0 +1,6 @@
+﻿Timestamp,Device_ID,Temperature,Humidity,CO,Smoke,Light,Motion,LPG
+1762948800,building2-sensor01,31.5,82,0.0061,0.025,true,false,0.0082
+1762948805,building2-sensor01,32.1,84,0.0064,0.027,true,true,0.0085
+1762948810,building2-sensor01,33.0,86,0.0068,0.030,false,true,0.0090
+1762948815,building2-sensor01,30.8,79,0.0059,0.023,false,false,0.0078
+1762948820,building2-sensor01,29.6,76,0.0055,0.021,true,false,0.0074
