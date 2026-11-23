@@ -578,10 +578,11 @@ If you need remote access, use a tunnel (Option C), never a port forward.
 GitHub Actions runs the database-free Python checks on every branch push and
 pull request. After they pass, it builds the API, Control Logic, Sensor
 Simulator, and Actuator Simulator Docker images. Builds on the repository's
-`main` branch are published to GitHub Container Registry (GHCR). Kubernetes
-deployment runs only when the repository variable `K8S_DEPLOY_ENABLED` is set
-to `true`. See [k8s/README.md](k8s/README.md) for cluster prerequisites and
-setup.
+`main` branch are published to GitHub Container Registry (GHCR). CI then
+updates the production image tags in Git; Argo CD automatically reconciles
+the cluster from those manifests. See [k8s/README.md](k8s/README.md) for
+cluster prerequisites, activation commands, verification commands, and
+Jira-ready subtasks and screenshot guidance.
 
 Database-backed tests are not included because they currently require an
 interactive password or a separately seeded test database.

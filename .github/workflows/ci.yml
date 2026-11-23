@@ -97,58 +97,31 @@ jobs:
             docker push "${image_name}:latest"
           fi
 
-  deploy:
-    name: Deploy to Kubernetes
+  update-gitops:
+    name: Update GitOps image tags
     needs: docker-build
     if: >-
       github.repository == 'D00281102/Devops_Group_Project' &&
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      vars.K8S_DEPLOY_ENABLED == 'true'
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: production
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Configure cluster access
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-          KUBECONFIG: ${{ runner.temp }}/kubeconfig
+        with:
+          ref: main
+      - name: Record published image tags in Git
         run: |
-          if [ -z "$KUBE_CONFIG" ]; then
-            echo "Configure the KUBE_CONFIG secret in the production environment." >&2
-            exit 1
+          set -euo pipefail
+          sed -i -E "s/(newTag: ).*/\1${GITHUB_SHA}/" k8s/kustomization.yaml
+          if git diff --quiet -- k8s/kustomization.yaml; then
+            echo "GitOps image tags already match ${GITHUB_SHA}."
+            exit 0
           fi
-          printf '%s' "$KUBE_CONFIG" > "$KUBECONFIG"
-          chmod 600 "$KUBECONFIG"
-          kubectl config current-context
-
-      - name: Apply Kubernetes manifests
-        env:
-          KUBECONFIG: ${{ runner.temp }}/kubeconfig
-        run: |
-          set -euo pipefail
-          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
-          kubectl apply -f k8s/namespace.yaml
-          sed \
-            -e "s|__IMAGE_OWNER__|${owner}|g" \
-            -e "s|__IMAGE_TAG__|${GITHUB_SHA}|g" \
-            k8s/applications.yaml.tmpl \
-            | kubectl apply -f -
-
-      - name: Verify rollout
-        env:
-          KUBECONFIG: ${{ runner.temp }}/kubeconfig
-        run: |
-          set -euo pipefail
-          for deployment in control-api control-logic; do
-            kubectl rollout status "deployment/${deployment}" \
-              --namespace iot-app \
-              --timeout=180s
-          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/kustomization.yaml
+          git commit -m "chore(gitops): deploy ${GITHUB_SHA}"
+          git push origin HEAD:main

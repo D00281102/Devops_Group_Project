@@ -4,7 +4,7 @@ apiVersion: 1
 datasources:
   - name: afzqyiomihla8d
     uid: afzqyiomihla8d
-    type: grafana-postgresql-datasource
+    type: postgres
     access: proxy
     url: postgres:5432
     user: $GF_DATASOURCE_USER

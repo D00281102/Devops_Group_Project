@@ -411,6 +411,9 @@ def start_control_logic():
     finally:
         client.loop_stop()
         client.disconnect()
+        if _command_producer is not None:
+            _command_producer.flush()
+            _command_producer.close()
         pool.close()
 
         # Historical telemetry lookup is optional for Kafka mode.
@@ -424,17 +427,6 @@ def start_control_logic():
         while True:
             import time
             time.sleep(1)
-
-    except KeyboardInterrupt:
-        print("Stopping IoT control logic...")
-
-    finally:
-        client.loop_stop()
-        client.disconnect()
-        if _command_producer is not None:
-            _command_producer.flush()
-            _command_producer.close()
-        pool.close()
 
 
 def start_kafka_consumer(client):
