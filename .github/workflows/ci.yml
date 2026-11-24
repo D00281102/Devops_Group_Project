@@ -49,6 +49,9 @@ jobs:
       - name: Test control logic
         run: python test_control_logic.py
 
+      - name: Smoke-test building API imports
+        run: python -c "import api.buildings"
+
   docker-build:
     name: Build ${{ matrix.image }} image
     needs: tests
@@ -115,13 +118,45 @@ jobs:
       - name: Record published image tags in Git
         run: |
           set -euo pipefail
-          sed -i -E "s/(newTag: ).*/\1${GITHUB_SHA}/" k8s/kustomization.yaml
-          if git diff --quiet -- k8s/kustomization.yaml; then
+          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+
+          update_image() {
+            local file="$1"
+            local image="$2"
+            local expected
+            local matches
+
+            if [ ! -f "$file" ]; then
+              echo "Expected deployment manifest not found: ${file}" >&2
+              exit 1
+            fi
+
+            expected="^[[:space:]]*image:[[:space:]]*(iot-${image}:local|ghcr[.]io/${owner}/devops-group-project-${image}:[^[:space:]]+)$"
+            matches="$(grep -Ec "$expected" "$file" || true)"
+            if [ "$matches" -ne 1 ]; then
+              echo "Expected exactly one local or GHCR image for ${image} in ${file}; found ${matches}." >&2
+              exit 1
+            fi
+
+            sed -i -E \
+              "s#^([[:space:]]*image:[[:space:]]*)(iot-${image}:local|ghcr[.]io/${owner}/devops-group-project-${image}:[^[:space:]]+)#\1ghcr.io/${owner}/devops-group-project-${image}:${GITHUB_SHA}#" \
+              "$file"
+            matches="$(grep -Ec "^[[:space:]]*image:[[:space:]]*ghcr[.]io/${owner}/devops-group-project-${image}:${GITHUB_SHA}$" "$file" || true)"
+            if [ "$matches" -ne 1 ]; then
+              echo "Expected exactly one updated image reference for ${image} in ${file}; found ${matches}." >&2
+              exit 1
+            fi
+          }
+
+          update_image k8s/control-api.yaml control-api
+          update_image k8s/control-logic.yaml control-logic
+
+          if git diff --quiet -- k8s/control-api.yaml k8s/control-logic.yaml; then
             echo "GitOps image tags already match ${GITHUB_SHA}."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add k8s/kustomization.yaml
+          git add k8s/control-api.yaml k8s/control-logic.yaml
           git commit -m "chore(gitops): deploy ${GITHUB_SHA}"
           git push origin HEAD:main

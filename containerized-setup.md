@@ -594,3 +594,264 @@ docker compose --env-file Prototype/.env up -d --build control-api
 - If port 8000 is already in use, check for another service using that port.
 - If the API cannot connect to the database, check the `.env` settings and confirm that the database service or configured database host is reachable.
 - If the Compose configuration is invalid, run `docker compose --env-file Prototype/.env config` to display the resolved configuration and look for errors.
+
+## One-command local CI and Compose run
+
+From the repository root in PowerShell, run:
+
+```powershell
+.\run-local-ci.ps1
+```
+
+The script runs the same two Python tests as GitHub Actions plus a building API
+import smoke test, builds the API, Control Logic, Sensor Simulator, and
+Actuator Simulator images, and starts the Docker Compose stack using the
+current checkout. It then waits up to three minutes for
+`GET /telemetry/?limit=1` to verify the API and database connection. Compose
+health checks get up to three additional minutes to finish or recover; if any
+remain unhealthy, the script prints service logs and health details. PostgreSQL
+must be out of recovery before initialization starts, and the idempotent
+database initialization retries transient failures up to three times.
+
+The full run requires Docker Desktop, Python 3.12, `Prototype/.env`, the Kafka
+Connect plugin directory at `C:\kafka\plugins`, and `curl.exe`. The script
+creates or repairs the repository `.venv` when needed. Do not commit
+`Prototype/.env` or include its secret values in logs or screenshots.
+
+To run the CI tests and build all four images without starting Compose:
+
+```powershell
+.\run-local-ci.ps1 -BuildOnly
+```
+
+The Compose services remain running after the script exits. Stop the stack
+without deleting its named data volumes by running:
+
+```powershell
+docker compose --env-file Prototype/.env down
+```
+
+This script validates the local checkout and Compose application. It does not
+deploy through Argo CD, publish images to GHCR, or push Git commits. GitHub's
+image publishing and GitOps update jobs run only for the configured
+main-branch workflow. For Argo CD setup and deployment verification, see the
+following **GitOps Deployment Management with Argo CD** section.
+
+## GitOps Deployment Management with Argo CD
+
+### Goal and deployment flow
+
+The deployment issue being addressed is that Argo CD repository synchronization
+has been demonstrated, but a healthy end-to-end Kubernetes deployment has not
+yet been verified. Earlier checks showed image-pull and application dependency
+problems. This work configures Argo CD to follow Git, automates container
+publishing and manifest updates, and verifies that the application reaches a
+healthy state.
+
+On a push to `main`, GitHub Actions runs the checks, builds the application
+images, publishes commit-SHA tags to GHCR, and updates the API and control-logic
+image references in the Kubernetes manifests. It then pushes a GitOps commit.
+Argo CD watches the `k8s` path on `main`, detects that commit, and reconciles the
+manifests to the cluster. Automatic sync applies the desired state; self-heal
+corrects manual drift; pruning removes resources deleted from Git. GitHub
+Actions does not need Kubernetes credentials.
+
+**Branch behavior:** Each teammate can work on `<branch name>`, but the image
+publishing and GitOps update jobs only run on `main`. Replace the placeholder
+with the actual remote branch name, without angle brackets, when testing a
+feature branch in a personal/local cluster. To test the full CI-to-deployment
+flow, merge reviewed changes to `main` through the team's pull-request process.
+Do not commit a personal branch name as the production Argo CD target revision.
+
+The Application manifest is `k8s/argocd/application.yaml`. It targets `main`
+and the `k8s` path. Main-branch workload namespaces can differ from feature
+branch namespaces; use the namespace declared in the manifests being tested.
+The local feature-branch test may change only the live Application in that
+local cluster.
+
+### Prerequisites
+
+- Docker Desktop and kind, or another Kubernetes cluster, with a working
+  `kubectl` context.
+- Argo CD installed in the cluster and repository access configured. Public
+  repositories do not need credentials; for a private repository configure a
+  read-only Git credential in Argo CD, not in Git.
+- Required runtime secrets and dependencies for the workloads in the selected
+  manifests. The Compose services described in this file do not automatically
+  become services in Kubernetes.
+- GitHub Actions workflow-token write permission and branch rules that permit
+  its GitOps commit to `main`. If policy disallows bot pushes, the workflow
+  needs to create a reviewed pull request instead.
+
+### Subtask 1 — Provision local Kubernetes and Argo CD
+
+Create the cluster only if it does not already exist. Check the context before
+installing Argo CD so it goes into the intended cluster:
+
+```powershell
+kind get clusters
+# Run only if iot-gitops is not listed:
+kind create cluster --name iot-gitops
+kubectl config use-context kind-iot-gitops
+kubectl config current-context
+kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=300s
+kubectl wait --for=condition=Available deployment/argocd-repo-server -n argocd --timeout=300s
+kubectl get nodes -o wide
+kubectl get pods -n argocd -o wide
+```
+
+**Expected:** The context is `kind-iot-gitops`, the node is Ready, and Argo CD
+pods are Running with their containers ready. **Evidence:** Save the context,
+node, and Argo CD pod output. **Recorded status:** The local kind cluster and
+Argo CD pods were reported ready.
+
+### Subtask 2 — Configure the Application and repository access
+
+Apply the committed Application, which tracks `main`, then refresh and inspect
+the resource state:
+
+```powershell
+kubectl apply -f k8s\argocd\application.yaml
+kubectl annotate application iot-app -n argocd argocd.argoproj.io/refresh=hard --overwrite
+kubectl get application iot-app -n argocd -o wide
+kubectl describe application iot-app -n argocd
+```
+
+For local feature-branch testing, the branch must already exist remotely and
+the desired changes must be pushed. Enter its name without the angle brackets:
+
+```powershell
+$branch = Read-Host "Enter <branch name>"
+git ls-remote --heads origin $branch
+```
+
+If Git lists the branch, run `kubectl edit application iot-app -n argocd`,
+change `spec.source.targetRevision` to the actual `<branch name>` (without
+angle brackets), and save. Then refresh and inspect:
+
+```powershell
+kubectl annotate application iot-app -n argocd argocd.argoproj.io/refresh=hard --overwrite
+kubectl get application iot-app -n argocd -o wide
+kubectl describe application iot-app -n argocd
+```
+
+After feature-branch testing, edit the local Application's
+`spec.source.targetRevision` back to `main` and refresh again. Branch changes
+apply only to the local cluster. Because pruning is enabled, changing branches
+can delete resources that are present only in the previous branch; check the
+manifests before switching.
+
+**Expected:** Argo CD can read and render the selected Git revision and reports
+its sync status, health, revision, and resources. **Evidence:** Application
+page or command output. **Recorded status:** Repository access and sync were
+previously demonstrated on a feature branch; the observed inventory then
+contained only the `iot-app` Namespace. Full workload health on `main` remains
+to be verified.
+
+Open the Argo CD UI in one PowerShell window:
+
+```powershell
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Then open `https://localhost:8080`. If the initial admin password is still
+available, retrieve it locally (do not include it in screenshots or Jira):
+
+```powershell
+$encodedPassword = kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encodedPassword))
+```
+
+Before syncing workloads, create the runtime Secrets required by the selected
+manifests in their target namespace. Keep credentials out of Git and avoid
+including secret values in saved terminal output.
+
+### Subtask 3 — Automate image publishing and GitOps updates
+
+This main-only automation is not tested by pushing to `<branch name>`. After
+the reviewed changes reach `main`, list recent workflow runs and inspect the
+run associated with the merged change:
+
+```powershell
+gh run list --workflow ci.yml --branch main --limit 5
+$runId = Read-Host "Enter the Actions run ID"
+gh run view $runId
+gh run view $runId --log
+```
+
+Confirm the Python checks, image builds, and **Update GitOps image tags** job
+succeeded. Then verify that the API and control-logic image references in the
+latest `main` contain the built commit SHA:
+
+```powershell
+$sha = gh run view $runId --json headSha --jq .headSha
+git fetch origin main
+git show origin/main:k8s/control-api.yaml | Select-String "image:.*$sha"
+git show origin/main:k8s/control-logic.yaml | Select-String "image:.*$sha"
+git log -1 --oneline origin/main
+```
+
+**Expected:** GHCR images are published with the source commit SHA, both
+manifest references are updated, and `main` contains the GitOps update commit.
+If the updater cannot push, check Actions token permissions and branch rules.
+**Evidence:** Successful Actions run, updated image references, and GitOps
+commit. **Recorded status:** A successful main-branch publishing and update
+run has not yet been evidenced.
+
+### Subtask 4 — Validate deployment health and visibility
+
+Check the Application, resources, and rollout status. Substitute the workload
+namespace if it differs from `devops` in the manifests being tested:
+
+```powershell
+kubectl get application iot-app -n argocd -o wide
+kubectl describe application iot-app -n argocd
+kubectl get deployments,pods,services -n devops
+kubectl rollout status deployment/control-api -n devops --timeout=180s
+kubectl rollout status deployment/control-logic -n devops --timeout=180s
+```
+
+If a pod is unhealthy, inspect its events:
+
+```powershell
+kubectl get pods -n devops
+$pod = Read-Host "Enter the unhealthy pod name"
+kubectl describe pod $pod -n devops
+```
+
+Forward the API in one terminal and request its endpoint from another:
+
+```powershell
+kubectl port-forward service/control-api -n devops 8000:8000
+```
+
+```powershell
+Invoke-WebRequest http://localhost:8000/telemetry/
+```
+
+**Expected:** Argo CD reports `Synced` and `Healthy`, both rollouts complete,
+and the endpoint returns successfully. `ImagePullBackOff` indicates image
+availability or pull access still needs attention; missing dependencies or
+secrets can also prevent readiness. **Evidence:** Application status, rollout
+output, and API response. **Recorded status:** Workload health and the API
+response are still pending successful runtime checks.
+
+### Jira-ready summary
+
+**Title:** Implement and verify GitOps deployments with Argo CD
+
+**Description:** Argo CD repository synchronization has been demonstrated, but
+the application has not yet passed end-to-end deployment health checks. The
+work configures a local Kubernetes/Argo CD environment, connects the
+Application to Git, automates GHCR image publishing and manifest updates on
+`main`, and verifies workload health and API availability. Feature branches
+can be tested locally using `<branch name>`, but only a reviewed merge to
+`main` activates the complete image-publishing and GitOps workflow.
+
+**Acceptance:** A successful main-branch workflow publishes images and updates
+their manifest references; Argo CD reconciles the GitOps commit; required
+workloads become healthy; and the API responds. Capture command output or
+screenshots for each completed subtask. Never include tokens, passwords,
+kubeconfig contents, or secret values in Jira.

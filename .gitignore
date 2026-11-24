@@ -1,4 +1,5 @@
 Prototype/data/
+.venv/
 __pycache__/
 # Local Grafana backups
 grafana.db.backup

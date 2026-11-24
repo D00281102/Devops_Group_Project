@@ -61,19 +61,17 @@ Five endpoints:
 
 ## 3. Setup — for teammates cloning the repo
 
-### 3.1 Install Python 3.12 or newer
+### 3.1 Install Python 3.12
 
-Python 3.11 will NOT work. The uvicorn version pulled in by the current
-requirements file imports `typing.NotRequired`, which only exists from
-Python 3.12 onward.
+The project CI and local checks use Python 3.12.
 
-Install Python 3.13 (matches the machines we tested on):
+Install Python 3.12:
 
-    winget install --id Python.Python.3.13
+    winget install --id Python.Python.3.12
 
 Close every PowerShell/VS Code window afterwards and open a new one. Then:
 
-    python --version      # should print Python 3.13.x
+    py -3.12 --version    # should print Python 3.12.x
 
 ### 3.2 Clone the repo
 
@@ -580,12 +578,48 @@ pull request. After they pass, it builds the API, Control Logic, Sensor
 Simulator, and Actuator Simulator Docker images. Builds on the repository's
 `main` branch are published to GitHub Container Registry (GHCR). CI then
 updates the production image tags in Git; Argo CD automatically reconciles
-the cluster from those manifests. See [k8s/README.md](k8s/README.md) for
-cluster prerequisites, activation commands, verification commands, and
-Jira-ready subtasks and screenshot guidance.
+the cluster from those manifests. See the [Argo CD deployment guide](containerized-setup.md#gitops-deployment-management-with-argo-cd)
+for cluster prerequisites, activation and verification commands, and
+Jira-ready subtasks.
 
 Database-backed tests are not included because they currently require an
 interactive password or a separately seeded test database.
+
+### Run the checks, build images, and start the local stack
+
+From the repository root in PowerShell, run:
+
+```powershell
+.\run-local-ci.ps1
+```
+
+This runs the same two Python tests as GitHub Actions plus a building API
+import smoke test, builds all four local application images, starts the Docker
+Compose stack, then waits up to three minutes for
+`GET /telemetry/?limit=1` to verify the API and database connection. After
+that, it allows Compose health checks up to three minutes to finish or recover,
+then prints service logs and health details if any remain unhealthy. PostgreSQL
+must be out of recovery before initialization starts, and the idempotent
+database initialization retries transient failures up to three times.
+It requires Docker Desktop, Python 3.12, `Prototype/.env`, and the Kafka
+Connect plugin directory at `C:\kafka\plugins`. Compose services remain running
+after the script exits; stop them with:
+
+```powershell
+docker compose --env-file Prototype/.env down
+```
+
+To run only the CI Python checks and build the images without starting the
+Compose services:
+
+```powershell
+.\run-local-ci.ps1 -BuildOnly
+```
+
+The script tests and runs the local Docker Compose setup; it does not deploy
+through Argo CD, publish to GHCR, or push commits to Git. Main-only CI and
+GitOps behavior must still be verified through a successful GitHub Actions run
+after changes reach `main`.
 
 ### Run the CI checks locally (PowerShell)
 
@@ -639,7 +673,7 @@ Push a commit to any branch or open a pull request, then open the repository's
 **Actions** tab and select the **CI** workflow. A successful run shows both
 Python checks and all four Docker image builds passed. Only a push to `main`
 publishes images; Kubernetes deployment has the additional setup and gate
-described in [k8s/README.md](k8s/README.md).
+described in the [Argo CD deployment guide](containerized-setup.md#gitops-deployment-management-with-argo-cd).
 
 ---
 
