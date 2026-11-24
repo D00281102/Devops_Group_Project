@@ -1,0 +1,255 @@
+﻿
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Control Settings</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 30px 16px;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 560px;
+            margin: 40px auto;
+            padding: 28px;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 26px;
+        }
+
+        .description {
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .field {
+            margin-top: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .light-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .light-control label {
+            margin: 0;
+        }
+
+        input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 28px;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        #status {
+            margin-top: 18px;
+            line-height: 1.5;
+        }
+
+        .success {
+            color: #15803d;
+        }
+
+        .error {
+            color: #b91c1c;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>IoT Control Settings</h1>
+
+        <p class="description">
+            Configure the temperature and humidity thresholds
+            and control the light.
+        </p>
+
+        <form id="settings-form">
+            <div class="field">
+                <label for="temperature">
+                    Temperature threshold (&deg;C)
+                </label>
+                <input
+                    type="number"
+                    id="temperature"
+                    name="temperature_threshold"
+                    value="25"
+                    min="-50"
+                    max="100"
+                    step="0.1"
+                    required
+                >
+            </div>
+
+            <div class="field">
+                <label for="humidity">
+                    Humidity threshold (%)
+                </label>
+                <input
+                    type="number"
+                    id="humidity"
+                    name="humidity_threshold"
+                    value="70"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    required
+                >
+            </div>
+
+            <div class="field light-control">
+                <label for="light">Light enabled</label>
+                <input
+                    type="checkbox"
+                    id="light"
+                    name="light_enabled"
+                    checked
+                >
+            </div>
+
+            <button type="submit" id="save-button">
+                Save Settings
+            </button>
+
+            <p id="status" role="status" aria-live="polite"></p>
+        </form>
+    </main>
+
+<script>
+    const form = document.getElementById("settings-form");
+    const temperatureInput = document.getElementById("temperature");
+    const humidityInput = document.getElementById("humidity");
+    const lightInput = document.getElementById("light");
+    const saveButton = document.getElementById("save-button");
+    const statusMessage = document.getElementById("status");
+
+    const API_URL = "http://127.0.0.1:8000/control-settings";
+
+    // Load the saved settings when the page opens.
+    async function loadSettings() {
+        statusMessage.textContent = "Loading saved settings...";
+        statusMessage.className = "";
+
+        try {
+            const response = await fetch(API_URL);
+
+            if (!response.ok) {
+                throw new Error("Could not load settings.");
+            }
+
+            const settings = await response.json();
+
+            temperatureInput.value = settings.temperature_threshold;
+            humidityInput.value = settings.humidity_threshold;
+            lightInput.checked = settings.light_enabled;
+
+            statusMessage.textContent = "Saved settings loaded.";
+            statusMessage.className = "success";
+        } catch (error) {
+            statusMessage.textContent =
+                "Unable to load settings. Check that the API is running.";
+            statusMessage.className = "error";
+        }
+    }
+
+    // Send the updated settings to the API.
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const settings = {
+            temperature_threshold: Number(temperatureInput.value),
+            humidity_threshold: Number(humidityInput.value),
+            light_enabled: lightInput.checked
+        };
+
+        saveButton.disabled = true;
+        statusMessage.textContent = "Saving settings...";
+        statusMessage.className = "";
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(settings)
+            });
+
+            if (!response.ok) {
+                throw new Error("Could not save settings.");
+            }
+
+            const savedSettings = await response.json();
+
+            temperatureInput.value = savedSettings.temperature_threshold;
+            humidityInput.value = savedSettings.humidity_threshold;
+            lightInput.checked = savedSettings.light_enabled;
+
+            statusMessage.textContent = "Settings saved successfully!";
+            statusMessage.className = "success";
+        } catch (error) {
+            statusMessage.textContent =
+                "Unable to save settings. Check the API and try again.";
+            statusMessage.className = "error";
+        } finally {
+            saveButton.disabled = false;
+        }
+    });
+
+    loadSettings();
+</script>
+</body>
+</html>
