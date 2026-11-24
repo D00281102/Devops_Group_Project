@@ -56,7 +56,8 @@ def process_database_data(client):
     print("Latest database sensor reading:")
     print(json.dumps(sensor_data, indent=4))
 
-    commands = evaluate_sensor_data(sensor_data)
+    settings = get_control_settings()
+    commands = evaluate_sensor_data(sensor_data, settings)
 
     if commands:
         print("Control decisions:")
@@ -71,34 +72,68 @@ def process_database_data(client):
     else:
         print("Control decision: No action required")
 
+def get_control_settings():
+    """
+    Retrieve the latest control settings from PostgreSQL.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT temperature_threshold,
+                       humidity_threshold,
+                       light_enabled
+                FROM control_settings
+                WHERE id = 1
+            """)
+
+            row = cur.fetchone()
+
+    if row is None:
+        raise RuntimeError("Control settings not found in database.")
+
+    return {
+        "temperature_threshold": row[0],
+        "humidity_threshold": row[1],
+        "light_enabled": row[2]
+    }
+
+
 def on_connect(client, userdata, flags, reason_code, properties):
     """
-    Confirm connection to MQTT for publishing actuator commands.
+    Subscribe to sensor readings after connecting to MQTT.
     """
-    print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+    if reason_code == 0:
+        print(f"Connected to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"Subscribing to: {SENSOR_TOPIC}")
 
-def evaluate_sensor_data(sensor_data):
+        client.subscribe(SENSOR_TOPIC)
+
+        print(f"Actuator commands will be published to: {ACTUATOR_TOPIC}")
+    else:
+        print(f"MQTT connection failed: {reason_code}")
+
+
+def evaluate_sensor_data(sensor_data, settings):
     """
-    Evaluate sensor readings and generate actuator commands.
+    Evaluate sensor readings using the latest control settings.
     """
     commands = []
 
-    if sensor_data["temp"] >= 25:
+    if sensor_data["temp"] >= settings["temperature_threshold"]:
         commands.append({
             "actuator": "fan",
             "action": "ON",
             "reason": "High temperature detected"
         })
 
-    if sensor_data["humidity"] >= 70:
+    if sensor_data["humidity"] >= settings["humidity_threshold"]:
         commands.append({
             "actuator": "dehumidifier",
             "action": "ON",
             "reason": "High humidity detected"
         })
 
-    if sensor_data["light"]:
+    if settings["light_enabled"] and sensor_data["light"]:
         commands.append({
             "actuator": "light",
             "action": "ON",
@@ -106,6 +141,7 @@ def evaluate_sensor_data(sensor_data):
         })
 
     return commands
+
 
 def publish_actuator_command(client, command):
     """
@@ -122,6 +158,7 @@ def publish_actuator_command(client, command):
     print(json.dumps(command, indent=4))
 
 
+
 def on_message(client, userdata, message):
     """
     Receive sensor data, evaluate it and publish actuator commands.
@@ -129,10 +166,18 @@ def on_message(client, userdata, message):
     try:
         sensor_data = json.loads(message.payload.decode("utf-8"))
 
+        if not isinstance(sensor_data, dict):
+            print("Invalid sensor reading: Expected a JSON object.")
+            return
+
         print("Sensor reading received:")
         print(json.dumps(sensor_data, indent=4))
 
-        commands = evaluate_sensor_data(sensor_data)
+        # Retrieve the latest settings from PostgreSQL.
+        settings = get_control_settings()
+
+        # Evaluate the sensor reading using the saved settings.
+        commands = evaluate_sensor_data(sensor_data, settings)
 
         if commands:
             print("Control decisions:")
@@ -150,31 +195,41 @@ def on_message(client, userdata, message):
 
         print()
 
-    except json.JSONDecodeError:
-            print("Error: Received message is not valid JSON.")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        print("Error: Received message is not valid JSON.")
 
+    except (KeyError, TypeError, ValueError) as error:
+        print(f"Invalid sensor reading: {error}. Skipping message.")
+
+    except Exception as error:
+        print(
+            f"Error processing sensor reading: {error}. "
+            "Skipping message."
+        )
 
 
 def start_control_logic():
     """
-    Connect to MQTT and process the latest sensor reading
-    retrieved from the PostgreSQL database.
+    Connect to MQTT and continuously process incoming sensor readings.
     """
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     client.on_connect = on_connect
-    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    client.on_message = on_message
 
     print("Starting IoT control logic...")
-    print("Retrieving latest sensor reading from database...\n")
+    print(f"Connecting to MQTT broker: {MQTT_BROKER}:{MQTT_PORT}")
 
-    client.loop_start()
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.loop_forever()
 
-    process_database_data(client)
+    except KeyboardInterrupt:
+        print("\nStopping IoT control logic...")
 
-    client.loop_stop()
-    client.disconnect()
-    pool.close()
+    finally:
+        client.disconnect()
+        pool.close()
 
 
 if __name__ == "__main__":

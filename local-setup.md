@@ -905,15 +905,7 @@ Sensor Topic: sensors/telemetry
 Actuator Topic: actuators/commands
 ```
 
-The control component subscribes to:
-
-```text
-sensors/telemetry
-```
-
-This is the same MQTT topic used by `Data_Sensor.py` to publish the simulated IoT sensor readings.
-
----
+The control component continuously subscribes to `sensors/telemetry` and processes incoming sensor readings.
 
 ## How the Control Logic Works
 
@@ -922,11 +914,11 @@ For every sensor reading received through MQTT, the control component performs t
 1. Receives a message from `sensors/telemetry`.
 2. Decodes the MQTT message payload.
 3. Converts the JSON payload into Python data.
-4. Reads the sensor values contained in the message.
-5. Evaluates the sensor values against the configured control rules.
-6. Determines whether an actuator action is required.
-7. Creates a structured actuator command when a rule is triggered.
-8. Converts the actuator command into JSON.
+4. Retrieves the latest control settings from PostgreSQL.
+5. Evaluates the sensor values against the saved temperature and humidity thresholds.
+6. Checks whether light control is enabled.
+7. Determines whether an actuator action is required.
+8. Creates a structured actuator command when a rule is triggered.
 9. Publishes the command to `actuators/commands`.
 10. Displays the control decision in the terminal.
 
@@ -936,30 +928,52 @@ If none of the configured control conditions are met, the program displays:
 Control decision: No action required
 ```
 
----
+## PostgreSQL Control Settings
 
-# Control Rules
+The control thresholds are stored in the PostgreSQL `control_settings` table.
 
-The current prototype uses three control rules.
+The Control Logic retrieves the latest saved settings whenever a new MQTT sensor reading arrives.
+
+The settings include:
+
+| Setting | Purpose |
+|---|---|
+| `temperature_threshold` | Temperature level that triggers the fan |
+| `humidity_threshold` | Humidity level that triggers the dehumidifier |
+| `light_enabled` | Enables or disables automatic light control |
+
+This replaces the previous hardcoded temperature and humidity thresholds.
+
+## Control Rules
+
+The Control Logic uses the following conditions:
 
 ```text
-Temperature >= 25°C  → Fan ON
+Temperature >= saved temperature threshold → Fan ON
 
-Humidity >= 70%      → Dehumidifier ON
+Humidity >= saved humidity threshold → Dehumidifier ON
 
-Light = True         → Light ON
+Light enabled AND light detected → Light ON
 ```
-
-These thresholds are used to demonstrate how incoming IoT sensor readings can automatically produce control actions.
 
 A single sensor reading can trigger more than one actuator.
 
-For example, a reading containing:
+For example, with the following saved settings:
 
 ```text
-Temperature: 27°C
-Humidity: 77%
-Light: True
+Temperature threshold: 30°C
+Humidity threshold: 60%
+Light enabled: True
+```
+
+A sensor reading containing:
+
+```json
+{
+    "temp": 32,
+    "humidity": 65,
+    "light": true
+}
 ```
 
 will trigger:
@@ -970,13 +984,154 @@ Dehumidifier ON
 Light ON
 ```
 
-A reading that does not meet any of the configured conditions will return:
+## Live Threshold Updates
+
+Control settings can be updated through the backend API:
 
 ```text
-No action required
+GET /control-settings
+PUT /control-settings
 ```
 
----
+When settings are updated through the API, the new values are saved in PostgreSQL.
+
+The Control Logic retrieves the latest settings when the next sensor message arrives. This means changes take effect while the application is running, without restarting the Control Logic process.
+
+For example:
+
+**Initial settings:**
+
+```text
+Temperature threshold: 30°C
+Humidity threshold: 60%
+```
+
+**Updated settings:**
+
+```text
+Temperature threshold: 35°C
+Humidity threshold: 70%
+```
+
+With the same sensor reading of 32°C and 65% humidity, the fan and dehumidifier will no longer activate after the settings are updated.
+
+## Error Handling
+
+The Control Logic includes basic error handling to prevent invalid messages or settings retrieval failures from stopping MQTT message processing.
+
+It handles:
+
+- Invalid JSON messages.
+- Sensor messages that are not JSON objects.
+- Missing or invalid sensor data.
+- Database or control settings retrieval errors.
+
+When an error occurs, the message is skipped and an error is displayed in the terminal. The application continues waiting for incoming sensor readings.
+
+## Control Logic Testing and Verification
+
+The Control Logic was tested using automated unit tests and live MQTT integration tests.
+
+### Automated Testing
+
+The Control Logic test file was executed using:
+
+```powershell
+python -m unittest test_control_logic -v
+```
+
+**Result:** All 14 tests passed.
+
+The tests covered:
+
+- Temperature threshold evaluation.
+- Humidity threshold evaluation.
+- Light control enabled and disabled.
+- Custom temperature and humidity thresholds.
+- Threshold boundary conditions.
+- Multiple actuator commands.
+- Invalid JSON messages.
+- Invalid sensor data.
+- Database and settings retrieval errors.
+
+The complete project test suite was also executed using:
+
+```powershell
+python -m unittest discover -s . -p "test_*.py" -v
+```
+
+**Result: 54 tests passed.**
+
+No test failures were reported.
+
+### Live MQTT Integration Testing
+
+The Control Logic was started and successfully connected to the Mosquitto MQTT broker at `localhost:1883`.
+
+It subscribed to `sensors/telemetry` and processed incoming sensor readings.
+
+The following test was performed:
+
+**Initial PostgreSQL settings:**
+
+| Setting | Value |
+|---|---:|
+| Temperature threshold | 30°C |
+| Humidity threshold | 60% |
+| Light enabled | True |
+
+**Sensor reading:**
+
+```json
+{
+    "temp": 32,
+    "humidity": 65,
+    "light": true
+}
+```
+
+The Control Logic generated the following commands:
+
+- FAN ON
+- DEHUMIDIFIER ON
+- LIGHT ON
+
+All three commands were published to `actuators/commands`.
+
+### Live Threshold Update Verification
+
+The control settings were then updated through the backend API without stopping or restarting the Control Logic.
+
+**Updated PostgreSQL settings:**
+
+| Setting | Value |
+|---|---:|
+| Temperature threshold | 35°C |
+| Humidity threshold | 70% |
+| Light enabled | True |
+
+The same sensor reading was published again.
+
+The Control Logic correctly applied the updated settings:
+
+- No fan command because 32°C was below the new 35°C threshold.
+- No dehumidifier command because 65% humidity was below the new 70% threshold.
+- LIGHT ON because light control remained enabled.
+
+This confirmed that the Control Logic retrieves and applies the latest PostgreSQL settings during runtime without requiring an application restart.
+
+### Testing Outcome
+
+The automated tests and live MQTT integration tests confirmed that:
+
+- Sensor readings are processed continuously through MQTT.
+- Control decisions use the latest saved PostgreSQL settings.
+- Updated temperature and humidity thresholds take effect during runtime.
+- Light control can be enabled or disabled.
+- Actuator commands are published when the configured conditions are met.
+- Invalid messages and settings retrieval errors are handled without stopping the message-processing callback.
+
+The Control Logic implementation and testing for this task were completed successfully.
 
 # Running the Control Logic
 
@@ -1012,12 +1167,13 @@ When the control component starts successfully, the terminal should display:
 
 ```text
 Starting IoT control logic...
+Connecting to MQTT broker: localhost:1883
 Connected to MQTT broker: localhost:1883
-Subscribed to MQTT topic: sensors/telemetry
-Waiting for sensor readings...
+Subscribing to: sensors/telemetry
+Actuator commands will be published to: actuators/commands
 ```
 
-The program will then wait for sensor readings to be published.
+The program will then continuously listen for sensor readings published to MQTT.
 
 Start `Data_Sensor.py` in another terminal.
 
@@ -1029,6 +1185,8 @@ Sensor reading received:
     ...
 }
 ```
+
+For every incoming reading, the Control Logic retrieves the latest control settings from PostgreSQL before evaluating the sensor values.
 
 If the sensor reading does not trigger a configured rule, the terminal should display:
 
@@ -1062,9 +1220,8 @@ Published actuator command to: actuators/commands
 Published actuator command to: actuators/commands
 ```
 
-This confirms that the sensor data has successfully passed from the sensor simulator through MQTT to the control component.
+This confirms that sensor data has successfully passed from the sensor simulator through MQTT to the Control Logic, which evaluates the readings using the latest saved PostgreSQL settings and publishes the required actuator commands.
 
----
 
 # Actuator Command Format
 

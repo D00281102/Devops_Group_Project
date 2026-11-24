@@ -1,8 +1,7 @@
-
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Add the Prototype folder to Python's import path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -10,10 +9,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Prevent a real PostgreSQL connection pool from being created
 sys.modules["api.db"] = MagicMock()
 
-from Control_Logic import evaluate_sensor_data
+from Control_Logic import evaluate_sensor_data, on_message
 
 
 class TestControlLogic(unittest.TestCase):
+
+    def setUp(self):
+        self.settings = {
+            "temperature_threshold": 25,
+            "humidity_threshold": 70,
+            "light_enabled": True
+        }
 
     # Test 1: All three actuators should activate
     def test_all_actuators_activate(self):
@@ -23,7 +29,7 @@ class TestControlLogic(unittest.TestCase):
             "light": True
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 3)
         self.assertEqual(commands[0]["actuator"], "fan")
@@ -38,7 +44,7 @@ class TestControlLogic(unittest.TestCase):
             "light": False
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 1)
         self.assertEqual(commands[0]["actuator"], "fan")
@@ -52,7 +58,7 @@ class TestControlLogic(unittest.TestCase):
             "light": False
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 1)
         self.assertEqual(commands[0]["actuator"], "dehumidifier")
@@ -66,7 +72,7 @@ class TestControlLogic(unittest.TestCase):
             "light": True
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 1)
         self.assertEqual(commands[0]["actuator"], "light")
@@ -80,11 +86,11 @@ class TestControlLogic(unittest.TestCase):
             "light": False
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 0)
 
-    # Test 6: Exact threshold values should activate the fan and dehumidifier
+    # Test 6: Exact threshold values should activate the actuators
     def test_threshold_boundaries(self):
         sensor_data = {
             "temp": 25,
@@ -92,7 +98,7 @@ class TestControlLogic(unittest.TestCase):
             "light": False
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(len(commands), 2)
         self.assertEqual(commands[0]["actuator"], "fan")
@@ -106,7 +112,7 @@ class TestControlLogic(unittest.TestCase):
             "light": True
         }
 
-        commands = evaluate_sensor_data(sensor_data)
+        commands = evaluate_sensor_data(sensor_data, self.settings)
 
         self.assertEqual(
             commands[0]["reason"],
@@ -120,6 +126,108 @@ class TestControlLogic(unittest.TestCase):
             commands[2]["reason"],
             "Light detected"
         )
+
+    # Test 8: Custom temperature threshold
+    def test_custom_temperature_threshold(self):
+        sensor_data = {
+            "temp": 28,
+            "humidity": 50,
+            "light": False
+        }
+
+        settings = self.settings.copy()
+        settings["temperature_threshold"] = 30
+
+        commands = evaluate_sensor_data(sensor_data, settings)
+
+        self.assertEqual(len(commands), 0)
+
+    # Test 9: Custom humidity threshold
+    def test_custom_humidity_threshold(self):
+        sensor_data = {
+            "temp": 20,
+            "humidity": 65,
+            "light": False
+        }
+
+        settings = self.settings.copy()
+        settings["humidity_threshold"] = 60
+
+        commands = evaluate_sensor_data(sensor_data, settings)
+
+        self.assertEqual(len(commands), 1)
+        self.assertEqual(commands[0]["actuator"], "dehumidifier")
+
+    # Test 10: Light should remain off when disabled
+    def test_light_disabled(self):
+        sensor_data = {
+            "temp": 20,
+            "humidity": 50,
+            "light": True
+        }
+
+        settings = self.settings.copy()
+        settings["light_enabled"] = False
+
+        commands = evaluate_sensor_data(sensor_data, settings)
+
+        self.assertEqual(len(commands), 0)
+
+    
+    # Test 11: Invalid JSON message should be handled safely
+    @patch("Control_Logic.get_control_settings")
+    def test_invalid_json_message(self, mock_settings):
+        message = MagicMock()
+        message.payload = b"invalid json"
+
+        client = MagicMock()
+
+        on_message(client, None, message)
+
+        mock_settings.assert_not_called()
+        client.publish.assert_not_called()
+
+    # Test 12: Invalid sensor data should be rejected
+    @patch("Control_Logic.get_control_settings")
+    def test_invalid_sensor_data(self, mock_settings):
+        message = MagicMock()
+        message.payload = b'["invalid", "sensor", "data"]'
+
+        client = MagicMock()
+
+        on_message(client, None, message)
+
+        mock_settings.assert_not_called()
+        client.publish.assert_not_called()
+
+    # Test 13: Database error should be handled safely
+    @patch("Control_Logic.get_control_settings")
+    def test_database_error_handling(self, mock_settings):
+        message = MagicMock()
+        message.payload = b'{"temp": 32, "humidity": 65, "light": true}'
+
+        mock_settings.side_effect = RuntimeError("Database unavailable")
+
+        client = MagicMock()
+
+        on_message(client, None, message)
+
+        mock_settings.assert_called_once()
+        client.publish.assert_not_called()
+
+    # Test 14: No commands should be published when settings fail
+    @patch("Control_Logic.get_control_settings")
+    def test_no_commands_when_settings_unavailable(self, mock_settings):
+        message = MagicMock()
+        message.payload = b'{"temp": 32, "humidity": 65, "light": true}'
+
+        mock_settings.side_effect = Exception("Settings unavailable")
+
+        client = MagicMock()
+
+        on_message(client, None, message)
+
+        client.publish.assert_not_called()
 
 
 if __name__ == "__main__":
