@@ -4,7 +4,7 @@ metadata:
   name: control-api-ingress
   namespace: devops
 spec:
-  ingressClassName: nginx
+  ingressClassName: t-traefik
   rules:
     - http:
         paths:
