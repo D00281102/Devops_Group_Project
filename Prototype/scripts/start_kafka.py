@@ -1,29 +1,37 @@
-import json
 from pathlib import Path
 import socket
 import subprocess
 import sys
 import time
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+from kafka.admin import KafkaAdminClient
+from kafka.errors import KafkaError, TopicAlreadyExistsError
 from dotenv import dotenv_values
 
-KAFKA_HOME = r"C:\kafka"
-CONNECT_URL = "http://localhost:8083"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+KAFKA_BOOTSTRAP_SERVERS = "127.0.0.1:9092"
+KAFKA_TOPIC = "sensor-telemetry"
 DB_PORT = int(
     dotenv_values(PROJECT_ROOT / "Prototype" / ".env").get("DB_PORT") or 5434
 )
 
 
-def start_kafka_KafkaUI():
-    # Start the shared database, MQTT broker, Kafka, UI, and Connect services.
+def start_kafka_services():
+    # Start the shared database, MQTT broker, Kafka, and UI.
     subprocess.run([
         'docker', 'compose',
         '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
-        'up', '-d', 'postgres', 'mosquitto', 'kafka',
-        'kafka-ui', 'kafka-connect'
+        'up', '-d', '--build', '--remove-orphans',
+        'postgres', 'mosquitto', 'kafka',
+        'kafka-ui'
+    ], cwd=PROJECT_ROOT, check=True)
+
+
+def start_mqtt_kafka_bridge():
+    subprocess.run([
+        'docker', 'compose',
+        '--env-file', str(PROJECT_ROOT / "Prototype" / ".env"),
+        'up', '-d', '--build', '--force-recreate', 'mqtt-kafka-bridge'
     ], cwd=PROJECT_ROOT, check=True)
 
 
@@ -50,73 +58,88 @@ def wait_for_postgres():
 
 def wait_for_kafka():
     # Wait until Kafka accepts connections from Windows.
+    # Verify a Kafka API request, not just an open listener socket.
+    last_error = None
     for attempt in range(30):
+        admin = None
         try:
-            with socket.create_connection(("localhost", 9092), timeout=2):
-                return
-        except OSError:
-            print(f"Waiting for Kafka... ({attempt + 1}/30)")
+            admin = KafkaAdminClient(
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                bootstrap_timeout_ms=5000,
+                request_timeout_ms=5000,
+            )
+            admin.describe_cluster()
+            return
+        except KafkaError as error:
+            last_error = error
+            print(f"Waiting for Kafka API... ({attempt + 1}/30): {error}")
+        finally:
+            if admin is not None:
+                admin.close()
+
+        if attempt < 29:
             time.sleep(2)
 
-    raise RuntimeError("Kafka did not become ready")
+    raise RuntimeError(
+        f"Kafka did not become ready through {KAFKA_BOOTSTRAP_SERVERS}: "
+        f"{last_error}"
+    ) from last_error
 
 
 def create_kafka_topic():
-    # Create the topic used for sensor telemetry.
-    command = [
-        rf"{KAFKA_HOME}\bin\windows\kafka-topics.bat",
-        '--create',
-        '--topic', 'sensor-telemetry',
-        '--bootstrap-server', 'localhost:9092',
-        '--partitions', '1',
-        '--replication-factor', '1'
-    ]
-
+    last_error = None
     for attempt in range(10):
-        result = subprocess.run(command, capture_output=True, text=True)
-
-        if result.returncode == 0 or "already exists" in result.stdout.lower():
-            return
-
-        print(f"Waiting to create Kafka topic... ({attempt + 1}/10)")
-        time.sleep(3)
-
-    raise RuntimeError(result.stderr or result.stdout)
-
-
-def wait_for_connect():
-    # Wait until Kafka Connect's REST API responds.
-    for attempt in range(30):
+        admin = None
         try:
-            with urlopen(f"{CONNECT_URL}/", timeout=3):
+            admin = KafkaAdminClient(
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                bootstrap_timeout_ms=5000,
+                request_timeout_ms=5000,
+            )
+            try:
+                admin.create_topics({
+                    KAFKA_TOPIC: {
+                        "num_partitions": 1,
+                        "replication_factor": 1,
+                    }
+                })
+            except TopicAlreadyExistsError:
+                pass
+
+            topic = admin.describe_topics([KAFKA_TOPIC])[0]
+            partitions = topic.get("partitions", [])
+            if (
+                topic.get("error_code") == 0
+                and partitions
+                and all(
+                    partition.get("error_code") == 0
+                    and partition.get("leader_id", -1) >= 0
+                    and partition.get("leader_id") in partition.get("isr_nodes", [])
+                    for partition in partitions
+                )
+            ):
                 return
-        except (OSError, URLError):
-            print(f"Waiting for Kafka Connect... ({attempt + 1}/30)")
-            time.sleep(2)
 
-    raise RuntimeError("Kafka Connect did not become ready")
+            last_error = RuntimeError(
+                f"Kafka topic {KAFKA_TOPIC} has no elected partition leader"
+            )
+            print(
+                f"Waiting for Kafka topic partition leader... "
+                f"({attempt + 1}/10)"
+            )
+        except KafkaError as error:
+            last_error = error
+            print(f"Waiting to create Kafka topic... ({attempt + 1}/10)")
+        finally:
+            if admin is not None:
+                admin.close()
 
+        if attempt < 9:
+            time.sleep(3)
 
-def start_kafka_connector():
-    # Register the MQTT source connector with Kafka Connect.
-    with open(PROJECT_ROOT / "connector-config.json", "r", encoding="utf-8") as file:
-        connector = json.load(file)
-
-    request = Request(
-        f"{CONNECT_URL}/connectors",
-        data=json.dumps(connector).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-
-    try:
-        with urlopen(request, timeout=10):
-            print("Kafka MQTT connector registered.")
-    except HTTPError as error:
-        if error.code == 409:
-            print("Kafka MQTT connector is already registered.")
-        else:
-            raise
+    raise RuntimeError(
+        f"Kafka topic {KAFKA_TOPIC} was not ready after retries: {last_error}"
+    ) from last_error
 
 
 def run_database_consumer():
@@ -129,13 +152,12 @@ def run_database_consumer():
 
 
 def start_kafka():
-    start_kafka_KafkaUI()
+    start_kafka_services()
     initialize_databases()
     wait_for_postgres()
     wait_for_kafka()
     create_kafka_topic()
-    wait_for_connect()
-    start_kafka_connector()
+    start_mqtt_kafka_bridge()
     run_database_consumer()
 
 

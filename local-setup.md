@@ -7,7 +7,7 @@
 ## Quick navigation
 
 - Sensor simulator, dataset and Mosquitto: sections below
-- Manual Kafka and Kafka Connect: **Kafka Integration**
+- MQTT-to-Kafka bridge: **Kafka Integration**
 - Local control logic and actuator simulator: **MQTT Control Logic and Actuator Simulator**
 - Grafana and its real-data dashboard: **Grafana Visualisation**
 - Telemetry API, endpoints and local PostgreSQL: **IoT Telemetry API**
@@ -346,7 +346,9 @@ For every row, the simulator performs the following steps:
 
 # Kafka Integration
 
-Kafka is used as a second-stage messaging system after MQTT. The Python sensor simulator publishes telemetry to Mosquitto, and Kafka Connect forwards those messages into an Apache Kafka topic. A Python consumer then reads the Kafka messages and stores the telemetry in PostgreSQL.
+Kafka is used as a second-stage messaging system after MQTT. A Python bridge
+subscribes to Mosquitto and forwards sensor payloads into Kafka. A Python
+consumer then validates the messages and stores them in PostgreSQL.
 
 The complete data flow is:
 
@@ -362,10 +364,12 @@ MQTT: sensors/telemetry
     v
 Mosquitto
     |
+    | MQTT: sensors/telemetry
     v
-Kafka Connect MQTT Source Connector
-     ↓ Kafka: sensor-telemetry
-Apache Kafka Broker (localhost:9092)
+Python MQTT-to-Kafka bridge
+     | Kafka: sensor-telemetry
+     v
+Apache Kafka Broker (127.0.0.1:9092)
      ↓
 Python database consumer
      ↓ PostgreSQL: existing iot_telemetry_data table
@@ -376,14 +380,15 @@ Python database consumer
 The Docker-based setup uses:
 
 - Apache Kafka broker.
-- Kafka Connect REST API on `localhost:8083`.
-- Mosquitto MQTT broker on port `1883` inside Docker.
-- MQTT source connector version `1.7.9`.
+- Mosquitto MQTT broker on port `1883`.
+- Python MQTT-to-Kafka bridge (`mqtt-kafka-bridge` Compose service).
 - Kafka topic `sensor-telemetry`.
 - Python Kafka consumer.
 - PostgreSQL database containing the `iot_telemetry_data` table.
 
-Kafka broker, Kafka Connect, Mosquitto, the database consumer, and the sensor are separate processes. The database consumer uses the existing PostgreSQL database configured in `Prototype/.env`; it does not create a database.
+The bridge uses the project's existing `paho-mqtt` and `kafka-python`
+dependencies. No Kafka Connect plugin or host Kafka installation is required.
+The database consumer uses the `Prototype/.env` database settings.
 
 ## Environment Setup
 
@@ -392,143 +397,66 @@ Before starting the services:
 1. Install Docker Desktop.
 2. Clone the project repository.
 3. Open PowerShell in the project root.
-4. Create a local `.env` file using `.env.example` as a guide.
-5. Configure the required PostgreSQL connection details in `.env`.
-6. Make sure the local PostgreSQL database and required project tables are available.
+4. Create `Prototype/.env` with the required database and authentication settings.
 
 Do not commit the `.env` file because it contains local configuration and credentials.
 
-The Docker services connect to the host PostgreSQL instance using `host.docker.internal`.
+## Start the ingestion pipeline
 
-## Starting the Services
-
-Open PowerShell in the project root:
+From the repository root, start the services and database consumer:
 
 ```powershell
-cd C:\DevOps_Group_Project
+python .\Prototype\scripts\start_kafka.py
 ```
 
-Build and start the Docker services:
+Keep that terminal running. In another terminal, publish sensor data:
 
 ```powershell
-docker compose up -d --build
+python .\Prototype\Data_Sensor.py
 ```
 
-This starts the required services, including:
+The bridge forwards the original MQTT payload bytes to Kafka topic
+`sensor-telemetry`. The database consumer validates each record and inserts
+it into `iot_telemetry_data`.
 
-- Mosquitto
-- Kafka
-- Kafka Connect
-- Telemetry consumer
-- Grafana
+## Verify the bridge
 
-Check the running containers:
+Check that the bridge container is running:
 
 ```powershell
-docker compose ps
+docker compose --env-file Prototype/.env ps mqtt-kafka-bridge
 ```
 
-The services should show as running. Kafka and Kafka Connect should also pass their configured health checks.
-
-## Kafka Connect Configuration
-
-The MQTT source connector uses the following configuration:
-
-- Connector class: `io.confluent.connect.mqtt.MqttSourceConnector`
-- MQTT broker: `tcp://mosquitto:1883`
-- MQTT topic: `sensors/telemetry`
-- Kafka topic: `sensor-telemetry`
-- MQTT QoS: `0`
-
-### 5. Start the Database Consumer
-
-In the terminal named `database consumer`, from the `Prototype` folder:
+Follow its logs to see subscription and forwarding messages:
 
 ```powershell
-Set-Location "C:\Devops_Group_Project\Prototype"
-py -m scripts.database_consumer
+docker compose --env-file Prototype/.env logs -f mqtt-kafka-bridge
 ```
 
-The consumer reads JSON records from `sensor-telemetry`, validates the
-telemetry fields, and inserts them into the existing `iot_telemetry_data`
-table using the same `Prototype/.env` database settings as the API. Install
-the project dependencies first with `py -m pip install -r requirements.txt`.
-
-### 6. Start the Sensor
-
-In the terminal named `sensor`:
-
-```powershell
-Set-Location "C:\Devops_Group_Project"
-py .\Prototype\Data_Sensor.py
-```
-
-## Verify Kafka Connect
-
-Use a separate PowerShell terminal for these commands.
-
-Check that Kafka Connect is responding:
-
-```powershell
-Invoke-RestMethod http://localhost:8083/
-```
-
-Check the connector status:
-
-```powershell
-Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
-```
-
-Both the connector and its task should report:
-
-```text
-RUNNING
-```
-
-## Telemetry Consumer
-
-The Python consumer is located at:
-
-- `mosquitto_sub` displays messages on `sensors/telemetry`.
-- The Kafka Connect connector reads those MQTT messages.
-- The database consumer inserts records from `sensor-telemetry` into the
-  configured PostgreSQL `iot_telemetry_data` table.
-- The original sensor JSON is forwarded as the Kafka record value.
+Kafka UI is available at `http://localhost:8081`; inspect the
+`sensor-telemetry` topic there.
 
 ## Troubleshooting
 
-**Kafka Connect is not responding**
+**The bridge is not forwarding messages**
 
-Check the service:
-
-```powershell
-docker compose ps kafka-connect
-docker compose logs --tail 50 kafka-connect
-```
-
-**The MQTT connector is not running**
-
-Check its status:
+Check the bridge and broker logs:
 
 ```powershell
-Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
+docker compose --env-file Prototype/.env logs --tail 100 mqtt-kafka-bridge kafka mosquitto
 ```
-
-Also inspect the Kafka Connect logs.
 
 **The telemetry consumer is not inserting records**
 
-Check its logs:
-
-```powershell
-docker compose logs --tail 50 telemetry-consumer
-```
+Check the startup terminal for database consumer errors and verify that
+`iot_telemetry_data` exists in the configured PostgreSQL database.
 
 Check that Kafka is healthy and that the PostgreSQL connection details in `.env` are correct.
 
 **No telemetry messages are reaching Kafka**
 
-Check that Mosquitto is running, the sensor is publishing to `sensors/telemetry`, and the MQTT source connector is running.
+Check that Mosquitto is running, the sensor is publishing to
+`sensors/telemetry`, and inspect the `mqtt-kafka-bridge` logs.
 
 Do not delete Docker volumes or database data as a normal troubleshooting step. Check the service logs first.
 
@@ -537,7 +465,7 @@ Do not delete Docker volumes or database data as a normal troubleshooting step. 
 To stop the Docker Compose services:
 
 ```powershell
-docker compose stop
+docker compose --env-file Prototype/.env stop
 ```
 
 This stops the containers without deleting their stored data.
@@ -545,7 +473,7 @@ This stops the containers without deleting their stored data.
 To start them again:
 
 ```powershell
-docker compose start
+docker compose --env-file Prototype/.env start
 ```
 
 6. Calculates the time difference between the current reading and the previous reading.

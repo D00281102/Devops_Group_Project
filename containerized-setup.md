@@ -1,15 +1,13 @@
 # Containerised IoT and Kafka Setup
 
 This guide covers the project's Docker Compose setup, including PostgreSQL
-with a persistent data volume, Kafka, Kafka Connect, Kafka UI, Mosquitto,
+with a persistent data volume, Kafka, Kafka UI, the Python MQTT-to-Kafka bridge, Mosquitto,
 the Sensor Simulator, Control Logic, Actuator Simulator, the Control API,
 and Grafana. The Windows-hosted Kafka consumer can also write telemetry to
 the PostgreSQL container through the published host port.
 
-**Note:** The Kafka section below includes the earlier Windows-based Kafka
-Connect plugin setup. The current Compose stack runs Mosquitto and the
-Sensor Simulator in Docker; Kafka Connect loads its MQTT plugin from the
-configured host plugin directory.
+The current Compose stack uses a Python bridge for MQTT-to-Kafka forwarding;
+the previous Kafka Connect plugin setup is no longer required.
 
 For the current containerised Sensor Simulator, Control Logic, Actuator Simulator and Mosquitto setup, see **Dockerised IoT Control System — SCRUM-102** further down this document.
 
@@ -23,16 +21,12 @@ Sensor Simulator (Docker) or Data_Sensor.py (Windows)
     v
 Mosquitto in Docker
     |
-    | MQTT source connector via host.docker.internal:1883
+    | MQTT: mosquitto:1883
     v
-Kafka Connect in Docker
-
-    |
-
-    | Kafka: localhost:9092
-
-    v
-
+Python MQTT-to-Kafka bridge in Docker
+    |
+    | Kafka: kafka:9093
+    v
 Kafka in Docker
     |
     +--> Kafka UI in Docker: http://localhost:8081
@@ -50,7 +44,6 @@ Install and start:
 - Docker Desktop
 
 - Python 3
-- Apache Kafka tools installed at `C:\kafka`
 
 Mosquitto does not need to be installed or started separately. Compose runs
 it using the configuration file at:
@@ -60,6 +53,10 @@ it using the configuration file at:
 Prototype/mosquitto.conf
 
 ```
+
+The startup script creates Kafka topics through `kafka-python`; neither a
+local Kafka installation nor command-line tools inside the container are
+required.
 
 The dataset must be located at:
 
@@ -163,11 +160,10 @@ Windows applications use the ports:
 
 ```text
 
-Kafka: localhost:9092
+Kafka: 127.0.0.1:9092
 
 MQTT: localhost:1883
 
-Kafka Connect REST API: localhost:8083
 Kafka UI: http://localhost:8081
 ```
 
@@ -177,7 +173,7 @@ Docker containers use these internal addresses:
 
 Kafka: kafka:9093
 
-MQTT from Kafka Connect: host.docker.internal:1883
+MQTT: mosquitto:1883
 
 ```
 
@@ -190,12 +186,11 @@ can connect to PostgreSQL using `postgres:5432`.
 From the project root:
 
 The Kafka startup script starts PostgreSQL, Mosquitto, Kafka, Kafka UI,
-Kafka Connect, the Kafka topic, the MQTT connector, and a Python consumer
+the MQTT-to-Kafka bridge, the Kafka topic, and a Python consumer
 that writes records into the same PostgreSQL
 `iot_telemetry_data` table. The consumer uses the `Prototype/.env` settings
 shared with the API. Mosquitto uses the project's `Prototype/mosquitto.conf`
-configuration so Kafka Connect running in Docker can connect to the MQTT
-broker.
+configuration.
 
 Run it from the project root:
 
@@ -224,7 +219,7 @@ Verify that Kafka is reachable from Windows:
 
 ```powershell
 
-Test-NetConnection localhost -Port 9092
+Test-NetConnection 127.0.0.1 -Port 9092
 
 ```
 
@@ -242,7 +237,9 @@ Open Kafka UI at:
 http://localhost:8081
 ```
 
-The script waits for Kafka before creating `sensor-telemetry`. It also waits for Kafka Connect before registering the MQTT source connector.
+The script waits for Kafka before creating `sensor-telemetry`. The Python
+bridge subscribes to `sensors/telemetry` and forwards the original payload to
+that Kafka topic.
 
 Check the running services:
 
@@ -250,39 +247,11 @@ Check the running services:
 docker compose --env-file Prototype/.env ps
 ```
 
-Check Kafka Connect:
+Follow bridge logs to verify it subscribed and is forwarding messages:
 
 ```powershell
-
-Invoke-RestMethod http://localhost:8083/
-
+docker compose --env-file Prototype/.env logs -f mqtt-kafka-bridge
 ```
-
-Check that the MQTT connector is loaded:
-
-```powershell
-
-Invoke-RestMethod http://localhost:8083/connector-plugins
-
-```
-
-The response should show:
-
-```text
-
-io.confluent.connect.mqtt.MqttSourceConnector
-
-```
-
-Check the connector status:
-
-```powershell
-
-Invoke-RestMethod http://localhost:8083/connectors/mqtt-source/status
-
-```
-
-The connector and task should both report `RUNNING`.
 
 ## MQTT Subscriber (Optional)
 Mosquitto is started automatically by `start_kafka.py`, so it does not need to be started manually.
@@ -343,9 +312,9 @@ intentionally want to delete the database volume and stored Kafka data.
 
 ## Previous Setup Scope (Historical)
 
-The current Compose file runs PostgreSQL, Kafka, Kafka UI, Kafka Connect,
-Mosquitto, Grafana, and the IoT control components in Docker. The Windows
-Kafka consumer remains a separate process and connects to PostgreSQL using
+The current Compose file runs PostgreSQL, Kafka, Kafka UI, the Python
+MQTT-to-Kafka bridge, Mosquitto, Grafana, and the IoT control components in
+Docker. The Windows database consumer connects to PostgreSQL using
 `Prototype/.env`.
 
 ## Dockerised IoT Control System — 21/10/26 updated
@@ -516,10 +485,9 @@ Before the full group deployment, the following integration points should be rev
 
 1. Confirm that `database-init` completes successfully and both applications
    connect to the initialized `control_settings_db`.
-2. Verify that Kafka Connect loads the MQTT plugin from the configured host
-   plugin directory.
-3. Replace the Windows-specific Kafka Connect plugin path when running on a
-   different operating system.
+2. Verify that the Python bridge forwards sensor messages from MQTT to Kafka.
+3. Confirm that the bridge works on the target operating system without a
+   host-specific Kafka plugin path.
 4. Confirm that all services start correctly using the local
    `Prototype/.env`.
 5. Retest the complete sensor, Kafka, telemetry database, control and
@@ -603,7 +571,7 @@ From the repository root in PowerShell, run:
 .\run-local-ci.ps1
 ```
 
-The script runs the same two Python tests as GitHub Actions plus a building API
+The script runs the same Python tests as GitHub Actions plus a building API
 import smoke test, builds the API, Control Logic, Sensor Simulator, and
 Actuator Simulator images, and starts the Docker Compose stack using the
 current checkout. It then waits up to three minutes for
@@ -613,12 +581,12 @@ remain unhealthy, the script prints service logs and health details. PostgreSQL
 must be out of recovery before initialization starts, and the idempotent
 database initialization retries transient failures up to three times.
 
-The full run requires Docker Desktop, Python 3.12, `Prototype/.env`, the Kafka
-Connect plugin directory at `C:\kafka\plugins`, and `curl.exe`. The script
+The full run requires Docker Desktop, Python 3.12, `Prototype/.env`, and
+`curl.exe`. The script
 creates or repairs the repository `.venv` when needed. Do not commit
 `Prototype/.env` or include its secret values in logs or screenshots.
 
-To run the CI tests and build all four images without starting Compose:
+To run the CI tests and build all five images without starting Compose:
 
 ```powershell
 .\run-local-ci.ps1 -BuildOnly

@@ -49,7 +49,7 @@ services:
     environment:
       # Configure listeners for both docker and host communication
       KAFKA_LISTENERS: CONTROLLER://localhost:9091,HOST://0.0.0.0:9092,DOCKER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,DOCKER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://127.0.0.1:9092,DOCKER://kafka:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,DOCKER:PLAINTEXT,HOST:PLAINTEXT
 
       # Settings required for KRaft mode
@@ -82,31 +82,19 @@ services:
       kafka:
         condition: service_healthy
 
-  kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.8
-    ports:
-      - "8083:8083"
+  mqtt-kafka-bridge:
+    build:
+      context: ./Prototype
+      dockerfile: Dockerfile.mqtt-kafka
+    image: iot-mqtt-kafka-bridge:latest
+    restart: unless-stopped
     environment:
-      CONNECT_BOOTSTRAP_SERVERS: kafka:9093
-      CONNECT_REST_PORT: 8083
-      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
-      CONNECT_GROUP_ID: connect-cluster
-      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
-      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
-      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_STATUS_STORAGE_TOPIC: connect-status
-      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.converters.ByteArrayConverter
-      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/usr/share/java/mqtt
-    volumes:
-      - type: bind
-        source: C:/kafka/plugins
-        target: /usr/share/java/mqtt
-        read_only: true
+      PYTHONUNBUFFERED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      KAFKA_TOPIC: sensor-telemetry
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_TOPIC: sensors/telemetry
     depends_on:
       kafka:
         condition: service_healthy

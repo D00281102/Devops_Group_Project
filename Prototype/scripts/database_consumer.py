@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from api.db import get_connection
 from api.models import TelemetryCreate
 
-BOOTSTRAP_SERVERS = "localhost:9092"
+BOOTSTRAP_SERVERS = "127.0.0.1:9092"
 TOPIC = "sensor-telemetry"
 CONSUMER_GROUP = "iot-telemetry-database"
 

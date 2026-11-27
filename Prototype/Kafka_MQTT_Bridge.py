@@ -10,7 +10,7 @@ from kafka import KafkaConsumer
 import paho.mqtt.client as mqtt
 
 
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
 KAFKA_COMMAND_TOPIC = os.getenv("KAFKA_COMMAND_TOPIC", "actuator-commands")
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))

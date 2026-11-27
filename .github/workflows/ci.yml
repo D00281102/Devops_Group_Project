@@ -49,6 +49,12 @@ jobs:
       - name: Test control logic
         run: python test_control_logic.py
 
+      - name: Test Kafka startup
+        run: python test_start_kafka.py
+
+      - name: Test MQTT-to-Kafka bridge
+        run: python test_mqtt_kafka_bridge.py
+
       - name: Smoke-test building API imports
         run: python -c "import api.buildings"
 
@@ -71,6 +77,8 @@ jobs:
             dockerfile: Dockerfile.sensor
           - image: actuator-simulator
             dockerfile: Dockerfile.actuator
+          - image: mqtt-kafka-bridge
+            dockerfile: Dockerfile.mqtt-kafka
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

@@ -10,8 +10,6 @@ $repositoryRoot = $PSScriptRoot
 $prototypeDirectory = Join-Path $repositoryRoot "Prototype"
 $venvPython = Join-Path $repositoryRoot ".venv\Scripts\python.exe"
 $envFile = Join-Path $prototypeDirectory ".env"
-$kafkaPluginDirectory = "C:\kafka\plugins"
-
 function Invoke-CheckedCommand {
     param(
         [Parameter(Mandatory = $true)]
@@ -72,9 +70,6 @@ if (-not $BuildOnly) {
     if (-not (Test-Path -LiteralPath $envFile)) {
         throw "Missing $envFile. Create Prototype\.env with the required local secrets before starting Compose."
     }
-    if (-not (Test-Path -LiteralPath $kafkaPluginDirectory)) {
-        throw "Missing $kafkaPluginDirectory, which docker-compose.yml mounts for Kafka Connect. Create it or correct the Compose mount before starting the stack."
-    }
     if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
         throw "curl.exe is required to verify the API after Compose starts."
     }
@@ -119,6 +114,12 @@ try {
         -Arguments @("test_control_logic.py") `
         -Description "Run control logic tests"
     Invoke-CheckedCommand -FilePath $venvPython `
+        -Arguments @("test_start_kafka.py") `
+        -Description "Run Kafka startup tests"
+    Invoke-CheckedCommand -FilePath $venvPython `
+        -Arguments @("test_mqtt_kafka_bridge.py") `
+        -Description "Run MQTT-to-Kafka bridge tests"
+    Invoke-CheckedCommand -FilePath $venvPython `
         -Arguments @("-c", "import api.buildings") `
         -Description "Smoke-test the building API imports"
 }
@@ -135,7 +136,8 @@ $images = @(
     @{ Dockerfile = "Dockerfile.api"; Tag = "iot-control-api:latest" },
     @{ Dockerfile = "Dockerfile.control"; Tag = "iot-control-logic:latest" },
     @{ Dockerfile = "Dockerfile.sensor"; Tag = "iot-sensor-simulator:latest" },
-    @{ Dockerfile = "Dockerfile.actuator"; Tag = "iot-actuator-simulator:latest" }
+    @{ Dockerfile = "Dockerfile.actuator"; Tag = "iot-actuator-simulator:latest" },
+    @{ Dockerfile = "Dockerfile.mqtt-kafka"; Tag = "iot-mqtt-kafka-bridge:latest" }
 )
 
 foreach ($image in $images) {
@@ -146,12 +148,12 @@ foreach ($image in $images) {
 }
 
 if ($BuildOnly) {
-    Write-Host "CI checks passed and all four local images were built. Compose services were not started."
+    Write-Host "CI checks passed and all five local images were built. Compose services were not started."
     return
 }
 
 Invoke-CheckedCommand -FilePath "docker.exe" `
-    -Arguments @("compose", "--env-file", $envFile, "up", "--detach", "--no-build") `
+    -Arguments @("compose", "--env-file", $envFile, "up", "--detach", "--no-build", "--remove-orphans") `
     -Description "Start the Docker Compose stack"
 
 $apiUrl = "http://localhost:8000/telemetry/?limit=1"
@@ -175,7 +177,7 @@ if (-not $apiReady) {
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "Could not retrieve Docker Compose service status."
     }
-    & docker.exe compose --env-file $envFile logs --tail=60 postgres database-init control-api kafka kafka-connect
+    & docker.exe compose --env-file $envFile logs --tail=60 postgres database-init control-api kafka mqtt-kafka-bridge
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "Could not retrieve one or more service logs."
     }
@@ -223,7 +225,7 @@ if ($pendingHealthChecks.Count -gt 0) {
     throw "The API/DB check passed, but Compose health checks did not all become healthy."
 }
 
-Write-Host "CI checks passed, all four images were built, the API/database check succeeded, and no Compose service reports unhealthy."
+Write-Host "CI checks passed, all five images were built, the API/database check succeeded, and no Compose service reports unhealthy."
 Write-Host "API docs: http://localhost:8000/docs"
 Write-Host "Kafka UI: http://localhost:8081"
 Write-Host "Grafana:  http://localhost:3001"

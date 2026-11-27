@@ -47,6 +47,7 @@ Five endpoints:
     ├── Data_Sensor.py          <- MQTT publisher (separate workstream)
     ├── scripts/
     │   ├── start_kafka.py      <- starts Kafka services and ingestion
+    │   ├── mqtt_kafka_bridge.py <- forwards MQTT sensor messages to Kafka
     │   └── database_consumer.py <- writes Kafka telemetry to PostgreSQL
     └── api/
         ├── __init__.py
@@ -247,7 +248,9 @@ The Kafka ingestion process uses the same `Prototype/.env` settings as the
 API and inserts each validated sensor message into the existing
 `iot_telemetry_data` table. It does not create a database or table.
 Start PostgreSQL first using section 3.5 and make sure the telemetry table
-exists.
+exists. A Python bridge in Docker forwards messages from MQTT topic
+`sensors/telemetry` to Kafka topic `sensor-telemetry`; no Kafka Connect plugin
+or separate Kafka installation is required.
 
 From the repository root, start the Kafka services and ingestion process:
 
@@ -593,17 +596,16 @@ From the repository root in PowerShell, run:
 .\run-local-ci.ps1
 ```
 
-This runs the same two Python tests as GitHub Actions plus a building API
-import smoke test, builds all four local application images, starts the Docker
+This runs the same Python tests as GitHub Actions plus a building API
+import smoke test, builds all five local application images, starts the Docker
 Compose stack, then waits up to three minutes for
 `GET /telemetry/?limit=1` to verify the API and database connection. After
 that, it allows Compose health checks up to three minutes to finish or recover,
 then prints service logs and health details if any remain unhealthy. PostgreSQL
 must be out of recovery before initialization starts, and the idempotent
 database initialization retries transient failures up to three times.
-It requires Docker Desktop, Python 3.12, `Prototype/.env`, and the Kafka
-Connect plugin directory at `C:\kafka\plugins`. Compose services remain running
-after the script exits; stop them with:
+It requires Docker Desktop, Python 3.12, and `Prototype/.env`. Compose services
+remain running after the script exits; stop them with:
 
 ```powershell
 docker compose --env-file Prototype/.env down
@@ -646,32 +648,35 @@ $env:AUTH_DB_PASSWORD = "ci-only-placeholder"
 $env:AUTH_SECRET_KEY = "ci-only-placeholder"
 ```
 
-Run the same two scripts as the GitHub Actions job:
+Run the same Python scripts as the GitHub Actions job:
 
 ```powershell
 Push-Location .\Prototype
 & ..\.venv\Scripts\python.exe test_sensor_analytics.py
 & ..\.venv\Scripts\python.exe test_control_logic.py
+& ..\.venv\Scripts\python.exe test_start_kafka.py
+& ..\.venv\Scripts\python.exe test_mqtt_kafka_bridge.py
 Pop-Location
 ```
 
 ### Build the CI Docker images locally
 
 With Docker Desktop running, execute these from the repository root. They
-build the same four images as CI but do not publish them:
+build the same five images as CI but do not publish them:
 
 ```powershell
 docker build -f Prototype\Dockerfile.api -t ci-control-api Prototype
 docker build -f Prototype\Dockerfile.control -t ci-control-logic Prototype
 docker build -f Prototype\Dockerfile.sensor -t ci-sensor-simulator Prototype
 docker build -f Prototype\Dockerfile.actuator -t ci-actuator-simulator Prototype
+docker build -f Prototype\Dockerfile.mqtt-kafka -t ci-mqtt-kafka-bridge Prototype
 ```
 
 ### View a GitHub Actions run
 
 Push a commit to any branch or open a pull request, then open the repository's
-**Actions** tab and select the **CI** workflow. A successful run shows both
-Python checks and all four Docker image builds passed. Only a push to `main`
+**Actions** tab and select the **CI** workflow. A successful run shows the
+Python checks and all five Docker image builds passed. Only a push to `main`
 publishes images; Kubernetes deployment has the additional setup and gate
 described in the [Argo CD deployment guide](containerized-setup.md#gitops-deployment-management-with-argo-cd).
 
