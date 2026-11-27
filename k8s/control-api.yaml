@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: control-api
-          image: iot-control-api:local
+          image: iot-control-api:v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
